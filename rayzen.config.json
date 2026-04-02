@@ -1,0 +1,106 @@
+{
+  "identity": {
+    "name": "Kai",
+    "language": "pt-BR",
+    "personality": "Você é direto, técnico e objetivo. Sem frases de abertura genéricas. Respostas concisas. Use markdown quando ajudar a clareza."
+  },
+  "modules": {
+    "brain": true,
+    "jarvis": true,
+    "doc": true,
+    "content": true,
+    "tts": true,
+    "stt": true
+  },
+  "llm": {
+    "classify": {
+      "model": "gpt-4o-mini",
+      "temperature": 0
+    },
+    "chat": {
+      "model": "gpt-4o",
+      "temperature": 0.7
+    },
+    "brain": {
+      "model": "gpt-4o-mini",
+      "temperature": 0.3
+    },
+    "doc": {
+      "model": "gpt-4o-mini",
+      "temperature": 0.2
+    },
+    "content": {
+      "model": "gpt-4o",
+      "temperature": 0.8
+    },
+    "jarvis": {
+      "model": "gpt-4o",
+      "temperature": 0.3
+    }
+  },
+  "agent": {
+    "pollIntervalMs": 3000,
+    "actions": {
+      "open_app": true,
+      "open_url": true,
+      "open_vscode": true,
+      "list_dir": true,
+      "file_search": true,
+      "organize_downloads": true,
+      "create_project_folder": true,
+      "get_system_info": true,
+      "screenshot": true,
+      "notify": true,
+      "clipboard_read": true,
+      "clipboard_write": true,
+      "git_status": true,
+      "git_log": true,
+      "git_branch": true,
+      "git_commit": true,
+      "run_command": true,
+      "docker_ps": true,
+      "docker_start": true,
+      "docker_stop": true,
+      "read_emails": true,
+      "send_email": true,
+      "get_calendar": true
+    },
+    "sandbox": {
+      "paths": [
+        "~/Projects",
+        "~/Desktop",
+        "~/Documents",
+        "~/Downloads"
+      ],
+      "allowedApps": [
+        "code",
+        "chrome",
+        "firefox",
+        "notion",
+        "slack"
+      ],
+      "allowedDomains": [
+        "youtube.com",
+        "youtu.be",
+        "github.com",
+        "google.com",
+        "notion.so",
+        "gmail.com",
+        "outlook.com",
+        "linkedin.com",
+        "spotify.com"
+      ]
+    },
+    "security": {
+      "sendEmailDryRun": false,
+      "gitCommitDryRun": false,
+      "organizeDownloadsDryRun": true,
+      "dockerStopDryRun": false,
+      "createProjectDryRun": false
+    }
+  },
+  "tts": {
+    "provider": "groq",
+    "voice": "daniel"
+  }
+}

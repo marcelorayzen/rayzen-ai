@@ -1,0 +1,711 @@
+'use client'
+
+import { useState, useRef, useEffect, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
+import ReactMarkdown from 'react-markdown'
+
+interface Message {
+  role: 'user' | 'assistant'
+  content: string
+  module?: string
+}
+
+interface Session {
+  sessionId: string
+  messages: number
+  lastActivity: string
+  title: string
+}
+
+type ImportTab = 'github' | 'file' | 'url'
+
+export default function Home() {
+  const [messages, setMessages] = useState<Message[]>([])
+  const [input, setInput] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [sessionId, setSessionId] = useState('')
+  const [playingIndex, setPlayingIndex] = useState<number | null>(null)
+  const [sessionTokens, setSessionTokens] = useState(0)
+  const [dailyTokens, setDailyTokens] = useState<number | null>(null)
+  const [recording, setRecording] = useState(false)
+  const [transcribing, setTranscribing] = useState(false)
+  const [sessions, setSessions] = useState<Session[]>([])
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [loadingSession, setLoadingSession] = useState<string | null>(null)
+  const [deletingSession, setDeletingSession] = useState<string | null>(null)
+  const router = useRouter()
+  const [importOpen, setImportOpen] = useState(false)
+  const [importTab, setImportTab] = useState<ImportTab>('github')
+  const [importLoading, setImportLoading] = useState(false)
+  const [importResult, setImportResult] = useState<string | null>(null)
+  const [githubUser, setGithubUser] = useState('')
+  const [githubToken, setGithubToken] = useState('')
+  const [importUrl, setImportUrl] = useState('')
+  const audioRef = useRef<HTMLAudioElement | null>(null)
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+  const chunksRef = useRef<Blob[]>([])
+  const tokenQueueRef = useRef<string[]>([])
+  const drainActiveRef = useRef(false)
+  const bottomRef = useRef<HTMLDivElement>(null)
+  const submitMessageRef = useRef<(text: string) => void>(() => {})
+
+  useEffect(() => {
+    const token = localStorage.getItem('rayzen_token')
+    if (!token) {
+      router.push('/login')
+      return
+    }
+  }, [router])
+
+  useEffect(() => {
+    fetch('http://localhost:3001/stats/tokens')
+      .then((r) => r.json())
+      .then((d) => setDailyTokens(d.last24h?.tokens ?? 0))
+      .catch(() => null)
+  }, [])
+
+  useEffect(() => {
+    setSessionId(Math.random().toString(36).slice(2) + Date.now().toString(36))
+  }, [])
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages])
+
+  const loadSessions = useCallback(async () => {
+    try {
+      const res = await fetch('http://localhost:3001/stats/sessions')
+      const data = await res.json() as Session[]
+      setSessions(data)
+    } catch {
+      // silencioso
+    }
+  }, [])
+
+  const openSidebar = useCallback(() => {
+    setSidebarOpen(true)
+    loadSessions()
+  }, [loadSessions])
+
+  const loadSession = useCallback(async (sid: string) => {
+    if (loadingSession) return
+    setLoadingSession(sid)
+    try {
+      const res = await fetch(`http://localhost:3001/stats/sessions/${sid}/messages`)
+      const data = await res.json() as Array<{ role: string; content: string; module: string | null }>
+      const loaded: Message[] = data.map((m) => ({
+        role: m.role as 'user' | 'assistant',
+        content: m.content,
+        module: m.module ?? undefined,
+      }))
+      setMessages(loaded)
+      setSessionId(sid)
+      setSessionTokens(0)
+      setSidebarOpen(false)
+    } catch {
+      // silencioso
+    } finally {
+      setLoadingSession(null)
+    }
+  }, [loadingSession])
+
+  const deleteSession = useCallback(async (sid: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (deletingSession) return
+    setDeletingSession(sid)
+    try {
+      await fetch(`http://localhost:3001/stats/sessions/${sid}`, { method: 'DELETE' })
+      setSessions((prev) => prev.filter((s) => s.sessionId !== sid))
+      if (sid === sessionId) {
+        setMessages([])
+        setSessionId(Math.random().toString(36).slice(2) + Date.now().toString(36))
+        setSessionTokens(0)
+      }
+    } catch {
+      // silencioso
+    } finally {
+      setDeletingSession(null)
+    }
+  }, [deletingSession, sessionId])
+
+  const newChat = useCallback(() => {
+    setMessages([])
+    setSessionId(Math.random().toString(36).slice(2) + Date.now().toString(36))
+    setSessionTokens(0)
+    setSidebarOpen(false)
+  }, [])
+
+  const handleImportGithub = useCallback(async () => {
+    if (!githubUser.trim()) return
+    setImportLoading(true)
+    setImportResult(null)
+    try {
+      const res = await fetch('http://localhost:3001/brain/index/github', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: githubUser.trim(), token: githubToken.trim() || undefined }),
+      })
+      const data = await res.json() as { indexed: number; repos: number }
+      setImportResult(`${data.repos} repositórios indexados (${data.indexed} chunks)`)
+    } catch (err) {
+      setImportResult(`Erro: ${err instanceof Error ? err.message : 'falhou'}`)
+    } finally {
+      setImportLoading(false)
+    }
+  }, [githubUser, githubToken])
+
+  const handleImportUrl = useCallback(async () => {
+    if (!importUrl.trim()) return
+    setImportLoading(true)
+    setImportResult(null)
+    try {
+      const res = await fetch('http://localhost:3001/brain/index/url', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: importUrl.trim() }),
+      })
+      const data = await res.json() as { indexed: number }
+      setImportResult(`${data.indexed} chunks indexados`)
+    } catch (err) {
+      setImportResult(`Erro: ${err instanceof Error ? err.message : 'falhou'}`)
+    } finally {
+      setImportLoading(false)
+    }
+  }, [importUrl])
+
+  const handleImportFile = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setImportLoading(true)
+    setImportResult(null)
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      const res = await fetch('http://localhost:3001/brain/index/file', {
+        method: 'POST',
+        body: formData,
+      })
+      const data = await res.json() as { indexed: number }
+      setImportResult(`${data.indexed} chunks indexados de "${file.name}"`)
+    } catch (err) {
+      setImportResult(`Erro: ${err instanceof Error ? err.message : 'falhou'}`)
+    } finally {
+      setImportLoading(false)
+      e.target.value = ''
+    }
+  }, [])
+
+  const drainQueue = useCallback(() => {
+    if (drainActiveRef.current) return
+    drainActiveRef.current = true
+
+    const tick = () => {
+      const token = tokenQueueRef.current.shift()
+      if (token === undefined) {
+        drainActiveRef.current = false
+        return
+      }
+      setMessages((prev) => {
+        const updated = [...prev]
+        const last = updated[updated.length - 1]
+        updated[updated.length - 1] = { ...last, content: last.content + token }
+        return updated
+      })
+      setTimeout(tick, 18)
+    }
+    tick()
+  }, [])
+
+  const toggleRecording = useCallback(async () => {
+    if (recording) {
+      mediaRecorderRef.current?.stop()
+      return
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4'
+      const mediaRecorder = new MediaRecorder(stream, { mimeType })
+      mediaRecorderRef.current = mediaRecorder
+      chunksRef.current = []
+
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data.size > 0) chunksRef.current.push(e.data)
+      }
+
+      mediaRecorder.onstop = async () => {
+        stream.getTracks().forEach((t) => t.stop())
+        setRecording(false)
+        setTranscribing(true)
+
+        const blob = new Blob(chunksRef.current, { type: mimeType })
+        const formData = new FormData()
+        formData.append('file', blob, `audio.${mimeType.includes('webm') ? 'webm' : 'mp4'}`)
+
+        try {
+          const res = await fetch('http://localhost:3001/stt/transcribe', {
+            method: 'POST',
+            body: formData,
+          })
+          if (!res.ok) throw new Error('STT falhou')
+          const data = await res.json() as { text: string }
+          if (data.text) submitMessageRef.current(data.text)
+        } catch (err) {
+          console.error('STT error:', err)
+        } finally {
+          setTranscribing(false)
+        }
+      }
+
+      mediaRecorder.start()
+      setRecording(true)
+    } catch (err) {
+      console.error('Microfone error:', err)
+    }
+  }, [recording])
+
+  const playAudio = useCallback(async (text: string, index: number) => {
+    if (playingIndex === index) {
+      audioRef.current?.pause()
+      setPlayingIndex(null)
+      return
+    }
+
+    setPlayingIndex(index)
+    try {
+      const res = await fetch('http://localhost:3001/tts/synthesize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text }),
+      })
+      if (!res.ok) throw new Error('TTS falhou')
+
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+
+      if (audioRef.current) {
+        audioRef.current.pause()
+        URL.revokeObjectURL(audioRef.current.src)
+      }
+
+      const audio = new Audio(url)
+      audioRef.current = audio
+      audio.onended = () => setPlayingIndex(null)
+      audio.onerror = () => setPlayingIndex(null)
+      await audio.play()
+    } catch {
+      setPlayingIndex(null)
+    }
+  }, [playingIndex])
+
+  const sendMessage = useCallback(async (userMessage: string) => {
+    if (!userMessage.trim() || loading) return
+    setInput('')
+    setMessages((prev) => [...prev, { role: 'user', content: userMessage }])
+    setLoading(true)
+
+    try {
+      const res = await fetch('http://localhost:3001/orchestrate/stream', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: userMessage, sessionId }),
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+
+      const reader = res.body?.getReader()
+      const decoder = new TextDecoder()
+      let currentModule = ''
+      let buffer = ''
+
+      setMessages((prev) => [...prev, { role: 'assistant', content: '', module: '' }])
+
+      while (reader) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop() ?? ''
+
+        for (const line of lines) {
+          if (line.startsWith('event: ')) continue
+          if (!line.startsWith('data: ')) continue
+
+          const data = JSON.parse(line.slice(6))
+
+          if (data.module) currentModule = data.module
+
+          if (data.text !== undefined) {
+            if (currentModule) {
+              setMessages((prev) => {
+                const updated = [...prev]
+                updated[updated.length - 1] = { ...updated[updated.length - 1], module: currentModule }
+                return updated
+              })
+            }
+            tokenQueueRef.current.push(data.text)
+            drainQueue()
+          }
+
+          if (data.tokensUsed !== undefined && data.tokensUsed > 0) {
+            setSessionTokens((prev) => prev + data.tokensUsed)
+            setDailyTokens((prev) => (prev ?? 0) + data.tokensUsed)
+          }
+        }
+      }
+    } catch (err) {
+      setMessages((prev) => [
+        ...prev,
+        { role: 'assistant', content: `Erro: ${err instanceof Error ? err.message : 'desconhecido'}` },
+      ])
+    } finally {
+      setLoading(false)
+    }
+  }, [loading, sessionId, drainQueue])
+
+  useEffect(() => {
+    submitMessageRef.current = sendMessage
+  }, [sendMessage])
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    sendMessage(input.trim())
+  }
+
+  function formatRelativeTime(dateStr: string) {
+    const diff = Date.now() - new Date(dateStr).getTime()
+    const mins = Math.floor(diff / 60000)
+    if (mins < 1) return 'agora'
+    if (mins < 60) return `${mins}min`
+    const hours = Math.floor(mins / 60)
+    if (hours < 24) return `${hours}h`
+    const days = Math.floor(hours / 24)
+    return `${days}d`
+  }
+
+  return (
+    <main className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col">
+      {/* Import modal */}
+      {importOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="fixed inset-0 bg-black/70" onClick={() => { setImportOpen(false); setImportResult(null) }} />
+          <div className="relative z-50 w-full max-w-md bg-zinc-900 border border-zinc-800 rounded-2xl p-6 mx-4">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-sm font-semibold text-zinc-200">Indexar no Brain</h2>
+              <button onClick={() => { setImportOpen(false); setImportResult(null) }} className="text-zinc-500 hover:text-zinc-300 text-xl leading-none">×</button>
+            </div>
+
+            {/* Tabs */}
+            <div className="flex gap-1 mb-4 bg-zinc-800 rounded-lg p-1">
+              {(['github', 'file', 'url'] as ImportTab[]).map((tab) => (
+                <button
+                  key={tab}
+                  onClick={() => { setImportTab(tab); setImportResult(null) }}
+                  className={`flex-1 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                    importTab === tab ? 'bg-zinc-700 text-zinc-100' : 'text-zinc-500 hover:text-zinc-300'
+                  }`}
+                >
+                  {tab === 'github' ? 'GitHub' : tab === 'file' ? 'Arquivo' : 'URL'}
+                </button>
+              ))}
+            </div>
+
+            {/* GitHub tab */}
+            {importTab === 'github' && (
+              <div className="space-y-3">
+                <div>
+                  <label className="text-xs text-zinc-500 mb-1 block">Usuário GitHub</label>
+                  <input
+                    value={githubUser}
+                    onChange={(e) => setGithubUser(e.target.value)}
+                    placeholder="ex: marcelorayzen"
+                    className="w-full bg-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 outline-none focus:ring-1 focus:ring-zinc-600"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-zinc-500 mb-1 block">Token (opcional — para repos privados)</label>
+                  <input
+                    value={githubToken}
+                    onChange={(e) => setGithubToken(e.target.value)}
+                    type="password"
+                    placeholder="ghp_..."
+                    className="w-full bg-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 outline-none focus:ring-1 focus:ring-zinc-600"
+                  />
+                </div>
+                <button
+                  onClick={handleImportGithub}
+                  disabled={importLoading || !githubUser.trim()}
+                  className="w-full bg-zinc-100 text-zinc-900 rounded-lg py-2 text-sm font-medium disabled:opacity-40 hover:bg-white transition-colors"
+                >
+                  {importLoading ? 'Indexando…' : 'Indexar repositórios'}
+                </button>
+              </div>
+            )}
+
+            {/* File tab */}
+            {importTab === 'file' && (
+              <div className="space-y-3">
+                <p className="text-xs text-zinc-500">Suporta PDF e TXT. Ideal para currículo, projetos, anotações.</p>
+                <label className={`flex flex-col items-center justify-center w-full h-28 border-2 border-dashed border-zinc-700 rounded-xl cursor-pointer hover:border-zinc-500 transition-colors ${importLoading ? 'opacity-40 pointer-events-none' : ''}`}>
+                  <span className="text-zinc-500 text-sm">{importLoading ? 'Indexando…' : 'Clique ou arraste o arquivo aqui'}</span>
+                  <span className="text-zinc-700 text-xs mt-1">.pdf, .txt</span>
+                  <input type="file" accept=".pdf,.txt" className="hidden" onChange={handleImportFile} />
+                </label>
+              </div>
+            )}
+
+            {/* URL tab */}
+            {importTab === 'url' && (
+              <div className="space-y-3">
+                <div>
+                  <label className="text-xs text-zinc-500 mb-1 block">URL da página</label>
+                  <input
+                    value={importUrl}
+                    onChange={(e) => setImportUrl(e.target.value)}
+                    placeholder="https://..."
+                    className="w-full bg-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 outline-none focus:ring-1 focus:ring-zinc-600"
+                  />
+                </div>
+                <button
+                  onClick={handleImportUrl}
+                  disabled={importLoading || !importUrl.trim()}
+                  className="w-full bg-zinc-100 text-zinc-900 rounded-lg py-2 text-sm font-medium disabled:opacity-40 hover:bg-white transition-colors"
+                >
+                  {importLoading ? 'Indexando…' : 'Indexar página'}
+                </button>
+              </div>
+            )}
+
+            {importResult && (
+              <p className={`mt-3 text-xs rounded-lg px-3 py-2 ${importResult.startsWith('Erro') ? 'bg-red-950 text-red-400' : 'bg-zinc-800 text-zinc-300'}`}>
+                {importResult}
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Sidebar overlay */}
+      {sidebarOpen && (
+        <div className="fixed inset-0 z-40 flex">
+          <div
+            className="fixed inset-0 bg-black/60"
+            onClick={() => setSidebarOpen(false)}
+          />
+          <div className="relative z-50 w-72 bg-zinc-900 border-r border-zinc-800 flex flex-col h-full">
+            <div className="px-4 py-4 border-b border-zinc-800 flex items-center justify-between">
+              <span className="text-sm font-semibold text-zinc-200">Histórico</span>
+              <button
+                onClick={() => setSidebarOpen(false)}
+                className="text-zinc-500 hover:text-zinc-300 text-lg leading-none"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="px-3 py-3 border-b border-zinc-800">
+              <button
+                onClick={newChat}
+                className="w-full rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-sm py-2 px-3 text-left transition-colors"
+              >
+                + Nova conversa
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto py-2">
+              {sessions.length === 0 && (
+                <p className="text-xs text-zinc-600 px-4 py-3">Nenhuma conversa ainda</p>
+              )}
+              {sessions.map((s) => (
+                <div
+                  key={s.sessionId}
+                  className={`group relative border-b border-zinc-800/50 ${
+                    s.sessionId === sessionId ? 'bg-zinc-800' : 'hover:bg-zinc-800'
+                  } transition-colors`}
+                >
+                  <button
+                    onClick={() => loadSession(s.sessionId)}
+                    disabled={loadingSession === s.sessionId}
+                    className={`w-full text-left px-4 py-3 pr-10 ${loadingSession === s.sessionId ? 'opacity-50' : ''}`}
+                  >
+                    <p className="text-sm text-zinc-200 truncate">{s.title}</p>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className="text-xs text-zinc-600">{s.messages} msgs</span>
+                      <span className="text-xs text-zinc-700">·</span>
+                      <span className="text-xs text-zinc-600">{formatRelativeTime(s.lastActivity ?? '')}</span>
+                    </div>
+                  </button>
+                  <button
+                    onClick={(e) => deleteSession(s.sessionId, e)}
+                    disabled={deletingSession === s.sessionId}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 text-zinc-600 hover:text-red-400 transition-all p-1 rounded"
+                    title="Deletar conversa"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <polyline points="3 6 5 6 21 6" />
+                      <path d="M19 6l-1 14H6L5 6" />
+                      <path d="M10 11v6M14 11v6" />
+                      <path d="M9 6V4h6v2" />
+                    </svg>
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Header */}
+      <div className="border-b border-zinc-800 px-6 py-4 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={openSidebar}
+            className="text-zinc-400 hover:text-zinc-200 transition-colors"
+            title="Histórico de conversas"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <line x1="3" y1="6" x2="21" y2="6" />
+              <line x1="3" y1="12" x2="21" y2="12" />
+              <line x1="3" y1="18" x2="21" y2="18" />
+            </svg>
+          </button>
+          <button
+            onClick={() => router.push('/settings')}
+            className="text-zinc-400 hover:text-zinc-200 transition-colors"
+            title="Configurações"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="12" cy="12" r="3"/>
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+            </svg>
+          </button>
+          <button
+            onClick={() => { setImportOpen(true); setImportResult(null) }}
+            className="text-zinc-400 hover:text-zinc-200 transition-colors"
+            title="Indexar no Brain"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="17 8 12 3 7 8" />
+              <line x1="12" y1="3" x2="12" y2="15" />
+            </svg>
+          </button>
+          <div>
+            <h1 className="text-lg font-semibold">Rayzen AI</h1>
+            <p className="text-xs text-zinc-500 mt-0.5">Sessão: {sessionId.slice(0, 8)}…</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => {
+              document.cookie = 'rayzen_token=; path=/; max-age=0'
+              localStorage.removeItem('rayzen_token')
+              router.push('/login')
+            }}
+            className="text-zinc-600 hover:text-zinc-400 transition-colors text-xs"
+            title="Sair"
+          >
+            sair
+          </button>
+          {sessionTokens > 0 && (
+            <div className="flex flex-col items-end">
+              <span className="text-xs text-zinc-400">
+                <span className="font-medium text-zinc-200">{sessionTokens.toLocaleString()}</span> tokens sessão
+              </span>
+              {dailyTokens !== null && (
+                <span className="text-xs text-zinc-600">
+                  {dailyTokens.toLocaleString()} hoje
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Messages */}
+      <div className="flex-1 overflow-y-auto px-4 py-6 flex flex-col gap-4 max-w-3xl w-full mx-auto">
+        {messages.length === 0 && (
+          <div className="text-center text-zinc-600 text-sm mt-20">Diga algo para começar…</div>
+        )}
+        {messages.map((msg, i) => (
+          <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+            <div
+              className={`max-w-[80%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${
+                msg.role === 'user' ? 'bg-zinc-100 text-zinc-900' : 'bg-zinc-800 text-zinc-100'
+              }`}
+            >
+              {msg.role === 'assistant' ? (
+                <div className="prose prose-invert prose-sm max-w-none">
+                  <ReactMarkdown>{msg.content}</ReactMarkdown>
+                </div>
+              ) : (
+                msg.content
+              )}
+
+              {msg.role === 'assistant' && (
+                <div className="mt-2 flex items-center gap-3">
+                  {msg.module && (
+                    <span className="text-xs text-zinc-500">módulo: {msg.module}</span>
+                  )}
+                  <button
+                    onClick={() => playAudio(msg.content, i)}
+                    className="text-xs text-zinc-400 hover:text-zinc-200 transition-colors flex items-center gap-1"
+                    title={playingIndex === i ? 'Pausar' : 'Ouvir resposta'}
+                  >
+                    {playingIndex === i ? (
+                      <span>⏸ pausar</span>
+                    ) : (
+                      <span>🔊 ouvir</span>
+                    )}
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+        {loading && (
+          <div className="flex justify-start">
+            <div className="bg-zinc-800 rounded-2xl px-4 py-3 text-sm text-zinc-400">Pensando…</div>
+          </div>
+        )}
+        <div ref={bottomRef} />
+      </div>
+
+      {/* Input */}
+      <div className="border-t border-zinc-800 px-4 py-4">
+        <form onSubmit={handleSubmit} className="flex gap-2 max-w-3xl mx-auto">
+          <input
+            type="text"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder="Digite uma mensagem ou use o microfone…"
+            disabled={loading}
+            className="flex-1 rounded-xl bg-zinc-800 px-4 py-3 text-sm outline-none placeholder:text-zinc-500 focus:ring-2 focus:ring-zinc-600 disabled:opacity-50"
+          />
+          <button
+            type="button"
+            onClick={toggleRecording}
+            disabled={loading || transcribing}
+            title={recording ? 'Parar gravação' : transcribing ? 'Transcrevendo…' : 'Gravar áudio'}
+            className={`rounded-xl px-4 py-3 text-sm font-medium transition-colors disabled:opacity-40 ${
+              recording
+                ? 'bg-red-500 text-white animate-pulse'
+                : transcribing
+                ? 'bg-zinc-600 text-zinc-300 animate-pulse'
+                : 'bg-zinc-700 text-zinc-200 hover:bg-zinc-600'
+            }`}
+          >
+            {recording ? '⏹' : transcribing ? '…' : '🎤'}
+          </button>
+          <button
+            type="submit"
+            disabled={loading || !input.trim()}
+            className="rounded-xl bg-zinc-100 px-5 py-3 text-sm font-medium text-zinc-900 disabled:opacity-40 hover:bg-white transition-colors"
+          >
+            Enviar
+          </button>
+        </form>
+      </div>
+    </main>
+  )
+}

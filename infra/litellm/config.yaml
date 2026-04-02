@@ -1,0 +1,37 @@
+model_list:
+  # LLM principal (classificação e chat)
+  - model_name: gpt-4o-mini
+    litellm_params:
+      model: groq/meta-llama/llama-4-scout-17b-16e-instruct
+      api_key: os.environ/GROQ_API_KEY
+
+  - model_name: gpt-4o
+    litellm_params:
+      model: groq/meta-llama/llama-4-scout-17b-16e-instruct
+      api_key: os.environ/GROQ_API_KEY
+
+  # Speech to Text
+  - model_name: whisper-1
+    litellm_params:
+      model: groq/whisper-large-v3-turbo
+      api_key: os.environ/GROQ_API_KEY
+
+  # Text to Speech
+  - model_name: tts-1
+    litellm_params:
+      model: groq/playai-tts
+      api_key: os.environ/GROQ_API_KEY
+
+  # Embeddings (mantém OpenAI pois Groq não tem)
+  - model_name: embedding
+    litellm_params:
+      model: openai/text-embedding-3-small
+      api_key: os.environ/OPENAI_API_KEY
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY
+
+router_settings:
+  routing_strategy: least-busy
+  allowed_fails: 2
+  cooldown_time: 60

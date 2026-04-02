@@ -1,0 +1,41 @@
+# Dependências
+node_modules/
+.pnpm-store/
+
+# Build
+dist/
+.next/
+out/
+
+# Ambiente — NUNCA commitar chaves reais
+.env
+.env.local
+*.env
+apps/api/.env
+apps/agent/.env
+apps/web/.env.local
+
+# Banco
+*.db
+*.sqlite
+prisma/migrations/dev/
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE
+.vscode/settings.json
+.idea/
+
+# Temp / cache
+tmp/
+*.tmp
+*.tsbuildinfo
+.cache/
