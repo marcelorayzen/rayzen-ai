@@ -9,7 +9,6 @@ export const ALLOWED_ACTIONS = new Set([
   'jarvis:file_search',
   'jarvis:organize_downloads',
   'jarvis:create_project_folder',
-  'jarvis:backup_files',
 
   // Sistema
   'jarvis:get_system_info',

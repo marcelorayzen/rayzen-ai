@@ -3,6 +3,16 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001'
+
+function authHeaders(extra?: Record<string, string>): Record<string, string> {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('rayzen_token') : null
+  return {
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...(extra ?? {}),
+  }
+}
+
 interface RayzenConfig {
   identity: { name: string; language: string; personality: string }
   modules: Record<string, boolean>
@@ -52,7 +62,7 @@ export default function SettingsPage() {
   useEffect(() => {
     const token = localStorage.getItem('rayzen_token')
     if (!token) { router.push('/login'); return }
-    fetch('http://localhost:3001/config')
+    fetch(`${API_URL}/config`, { headers: authHeaders() })
       .then((r) => r.json())
       .then((d) => setConfig(d as RayzenConfig))
       .catch(() => null)
@@ -62,9 +72,9 @@ export default function SettingsPage() {
     if (!config) return
     setSaving(true)
     try {
-      await fetch('http://localhost:3001/config', {
+      await fetch(`${API_URL}/config`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify(config),
       })
       setSaved(true)

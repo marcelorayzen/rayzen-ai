@@ -1,6 +1,16 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001'
+
+function authHeaders(extra?: Record<string, string>): Record<string, string> {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('rayzen_token') : null
+  return {
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...(extra ?? {}),
+  }
+}
 import { useRouter } from 'next/navigation'
 import ReactMarkdown from 'react-markdown'
 
@@ -58,14 +68,14 @@ export default function Home() {
   }, [router])
 
   useEffect(() => {
-    fetch('http://localhost:3001/stats/tokens')
+    fetch(`${API_URL}/stats/tokens`, { headers: authHeaders() })
       .then((r) => r.json())
       .then((d) => setDailyTokens(d.last24h?.tokens ?? 0))
       .catch(() => null)
   }, [])
 
   useEffect(() => {
-    setSessionId(Math.random().toString(36).slice(2) + Date.now().toString(36))
+    setSessionId(crypto.randomUUID())
   }, [])
 
   useEffect(() => {
@@ -74,7 +84,7 @@ export default function Home() {
 
   const loadSessions = useCallback(async () => {
     try {
-      const res = await fetch('http://localhost:3001/stats/sessions')
+      const res = await fetch(`${API_URL}/stats/sessions`, { headers: authHeaders() })
       const data = await res.json()
       setSessions(Array.isArray(data) ? data : [])
     } catch {
@@ -91,7 +101,7 @@ export default function Home() {
     if (loadingSession) return
     setLoadingSession(sid)
     try {
-      const res = await fetch(`http://localhost:3001/stats/sessions/${sid}/messages`)
+      const res = await fetch(`${API_URL}/stats/sessions/${sid}/messages`, { headers: authHeaders() })
       const data = await res.json() as Array<{ role: string; content: string; module: string | null }>
       const loaded: Message[] = data.map((m) => ({
         role: m.role as 'user' | 'assistant',
@@ -114,11 +124,11 @@ export default function Home() {
     if (deletingSession) return
     setDeletingSession(sid)
     try {
-      await fetch(`http://localhost:3001/stats/sessions/${sid}`, { method: 'DELETE' })
+      await fetch(`${API_URL}/stats/sessions/${sid}`, { method: 'DELETE', headers: authHeaders() })
       setSessions((prev) => prev.filter((s) => s.sessionId !== sid))
       if (sid === sessionId) {
         setMessages([])
-        setSessionId(Math.random().toString(36).slice(2) + Date.now().toString(36))
+        setSessionId(crypto.randomUUID())
         setSessionTokens(0)
       }
     } catch {
@@ -130,7 +140,7 @@ export default function Home() {
 
   const newChat = useCallback(() => {
     setMessages([])
-    setSessionId(Math.random().toString(36).slice(2) + Date.now().toString(36))
+    setSessionId(crypto.randomUUID())
     setSessionTokens(0)
     setSidebarOpen(false)
   }, [])
@@ -142,9 +152,9 @@ export default function Home() {
     try {
       // Remove URL caso o usuário cole o link completo
       const username = githubUser.trim().replace(/^https?:\/\/github\.com\//, '').replace(/\/$/, '')
-      const res = await fetch('http://localhost:3001/brain/index/github', {
+      const res = await fetch(`${API_URL}/brain/index/github`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ username, token: githubToken.trim() || undefined }),
       })
       if (!res.ok) {
@@ -165,9 +175,9 @@ export default function Home() {
     setImportLoading(true)
     setImportResult(null)
     try {
-      const res = await fetch('http://localhost:3001/brain/index/url', {
+      const res = await fetch(`${API_URL}/brain/index/url`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ url: importUrl.trim() }),
       })
       if (!res.ok) throw new Error(await res.text() || `HTTP ${res.status}`)
@@ -188,8 +198,9 @@ export default function Home() {
     try {
       const formData = new FormData()
       formData.append('file', file)
-      const res = await fetch('http://localhost:3001/brain/index/file', {
+      const res = await fetch(`${API_URL}/brain/index/file`, {
         method: 'POST',
+        headers: authHeaders(),
         body: formData,
       })
       if (!res.ok) throw new Error(await res.text() || `HTTP ${res.status}`)
@@ -251,8 +262,9 @@ export default function Home() {
         formData.append('file', blob, `audio.${mimeType.includes('webm') ? 'webm' : 'mp4'}`)
 
         try {
-          const res = await fetch('http://localhost:3001/stt/transcribe', {
+          const res = await fetch(`${API_URL}/stt/transcribe`, {
             method: 'POST',
+            headers: authHeaders(),
             body: formData,
           })
           if (!res.ok) throw new Error('STT falhou')
@@ -281,9 +293,9 @@ export default function Home() {
 
     setPlayingIndex(index)
     try {
-      const res = await fetch('http://localhost:3001/tts/synthesize', {
+      const res = await fetch(`${API_URL}/tts/synthesize`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ text }),
       })
       if (!res.ok) throw new Error('TTS falhou')
@@ -313,9 +325,9 @@ export default function Home() {
     setLoading(true)
 
     try {
-      const res = await fetch('http://localhost:3001/orchestrate/stream', {
+      const res = await fetch(`${API_URL}/orchestrate/stream`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ prompt: userMessage, sessionId }),
       })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
@@ -339,7 +351,12 @@ export default function Home() {
           if (line.startsWith('event: ')) continue
           if (!line.startsWith('data: ')) continue
 
-          const data = JSON.parse(line.slice(6))
+          let data: Record<string, unknown>
+          try {
+            data = JSON.parse(line.slice(6)) as Record<string, unknown>
+          } catch {
+            continue
+          }
 
           if (data.module) currentModule = data.module
 
