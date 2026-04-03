@@ -4,6 +4,7 @@ import { PrismaClient } from '@prisma/client'
 import OpenAI from 'openai'
 import { createHash } from 'crypto'
 // eslint-disable-next-line @typescript-eslint/no-require-imports
+// eslint-disable-next-line @typescript-eslint/no-require-imports
 const pdfParse = require('pdf-parse') as (buf: Buffer) => Promise<{ text: string }>
 
 export interface IndexResult {
@@ -255,8 +256,16 @@ Língua: português brasileiro.`,
     return { indexed: chunks.length }
   }
 
-  async indexUrl(url: string): Promise<{ indexed: number }> {
-    const res = await fetch(url, { headers: { 'User-Agent': 'rayzen-ai' } })
+  async indexUrl(rawUrl: string): Promise<{ indexed: number }> {
+    // Garante protocolo
+    const url = /^https?:\/\//i.test(rawUrl) ? rawUrl : `https://${rawUrl}`
+
+    const res = await fetch(url, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; rayzen-ai/1.0)' },
+    })
+
+    if (!res.ok) throw new Error(`Falha ao buscar URL: HTTP ${res.status}`)
+
     const html = await res.text()
 
     // Remove tags HTML, scripts, styles
@@ -266,6 +275,8 @@ Língua: português brasileiro.`,
       .replace(/<[^>]+>/g, ' ')
       .replace(/\s{2,}/g, '\n')
       .trim()
+
+    if (!text) throw new Error('Página sem conteúdo legível')
 
     const chunks = this.chunkText(text)
     const domain = new URL(url).hostname

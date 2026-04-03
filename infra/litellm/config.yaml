@@ -1,11 +1,10 @@
 model_list:
-  # LLM principal (classificação e chat)
-  - model_name: gpt-4o-mini
+  - model_name: gpt-4o
     litellm_params:
       model: groq/meta-llama/llama-4-scout-17b-16e-instruct
       api_key: os.environ/GROQ_API_KEY
 
-  - model_name: gpt-4o
+  - model_name: gpt-4o-mini
     litellm_params:
       model: groq/meta-llama/llama-4-scout-17b-16e-instruct
       api_key: os.environ/GROQ_API_KEY

@@ -162,3 +162,4 @@ Antes de mudar uma decisão arquitetural, registrar aqui:
 - [ ] Atualizar Puppeteer para versão >= 24.15.0 (deprecation warning)
 - [ ] Sidebar com busca no histórico de conversas
 - [ ] Exportar conversa como PDF/TXT
+- [ ] **Migrar Outlook para Microsoft Graph API** — A automação COM (`New-Object -ComObject Outlook.Application`) só funciona com o Outlook clássico. O novo Outlook (versão web/wrapper) não expõe o objeto COM. Migrar para a [Microsoft Graph API](https://learn.microsoft.com/en-us/graph/api/user-list-messages) requer registrar um app no Azure AD com permissões `Mail.Read` e `Mail.Send`. Funciona com qualquer versão do Outlook e também com outros provedores Microsoft 365.

@@ -75,8 +75,8 @@ export default function Home() {
   const loadSessions = useCallback(async () => {
     try {
       const res = await fetch('http://localhost:3001/stats/sessions')
-      const data = await res.json() as Session[]
-      setSessions(data)
+      const data = await res.json()
+      setSessions(Array.isArray(data) ? data : [])
     } catch {
       // silencioso
     }
@@ -140,11 +140,17 @@ export default function Home() {
     setImportLoading(true)
     setImportResult(null)
     try {
+      // Remove URL caso o usuário cole o link completo
+      const username = githubUser.trim().replace(/^https?:\/\/github\.com\//, '').replace(/\/$/, '')
       const res = await fetch('http://localhost:3001/brain/index/github', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: githubUser.trim(), token: githubToken.trim() || undefined }),
+        body: JSON.stringify({ username, token: githubToken.trim() || undefined }),
       })
+      if (!res.ok) {
+        const err = await res.text()
+        throw new Error(err || `HTTP ${res.status}`)
+      }
       const data = await res.json() as { indexed: number; repos: number }
       setImportResult(`${data.repos} repositórios indexados (${data.indexed} chunks)`)
     } catch (err) {
@@ -164,6 +170,7 @@ export default function Home() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: importUrl.trim() }),
       })
+      if (!res.ok) throw new Error(await res.text() || `HTTP ${res.status}`)
       const data = await res.json() as { indexed: number }
       setImportResult(`${data.indexed} chunks indexados`)
     } catch (err) {
@@ -185,6 +192,7 @@ export default function Home() {
         method: 'POST',
         body: formData,
       })
+      if (!res.ok) throw new Error(await res.text() || `HTTP ${res.status}`)
       const data = await res.json() as { indexed: number }
       setImportResult(`${data.indexed} chunks indexados de "${file.name}"`)
     } catch (err) {
