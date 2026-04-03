@@ -365,7 +365,7 @@ Seja direto, claro e amigável. Português brasileiro. Sem JSON bruto.`,
       take: 20,
     })
 
-    const historyMessages: ChatMessage[] = history.map((m) => ({
+    const historyMessages: ChatMessage[] = history.map((m: { role: string; content: string }) => ({
       role: m.role as 'user' | 'assistant',
       content: m.content,
     }))
@@ -476,7 +476,7 @@ Seja criterioso — não memorize perguntas, comandos ou respostas genéricas.`,
       take: 20,
     })
 
-    const historyMessages: ChatMessage[] = history.map((m) => ({
+    const historyMessages: ChatMessage[] = history.map((m: { role: string; content: string }) => ({
       role: m.role as 'user' | 'assistant',
       content: m.content,
     }))

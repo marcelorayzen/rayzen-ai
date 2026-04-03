@@ -16,7 +16,7 @@ export class StatsService {
       _sum: { tokensUsed: true },
       _count: { id: true },
       orderBy: { _sum: { tokensUsed: 'desc' } },
-    })
+    }) as Array<{ module: string | null; _sum: { tokensUsed: number | null }; _count: { id: number } }>
 
     const last24h = await this.prisma.conversationMessage.aggregate({
       where: { createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) } },
@@ -48,7 +48,7 @@ export class StatsService {
       _max: { createdAt: true },
       orderBy: { _max: { createdAt: 'desc' } },
       take: limit,
-    })
+    }) as Array<{ sessionId: string; _count: { id: number }; _max: { createdAt: Date | null } }>
 
     // Pega a primeira mensagem do usuário de cada sessão como título
     const sessionIds = sessions.map((s) => s.sessionId)
@@ -58,7 +58,7 @@ export class StatsService {
       distinct: ['sessionId'],
     })
 
-    const titleMap = new Map(firstMessages.map((m) => [m.sessionId, m.content]))
+    const titleMap = new Map<string, string>(firstMessages.map((m: { sessionId: string; content: string }) => [m.sessionId, m.content]))
 
     return sessions.map((s) => ({
       sessionId: s.sessionId,

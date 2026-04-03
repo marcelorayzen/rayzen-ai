@@ -104,7 +104,7 @@ export class BrainService {
       LIMIT ${limit}
     `
 
-    return results.map((r) => ({
+    return results.map((r: { id: string; content: string; source_path: string | null; metadata: Record<string, unknown>; score: number }) => ({
       id: r.id,
       content: r.content,
       sourcePath: r.source_path,
