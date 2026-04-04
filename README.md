@@ -3,232 +3,195 @@
 <img src="https://img.shields.io/badge/Rayzen_AI-v0.1.0-6366f1?style=for-the-badge&logoColor=white" />
 <img src="https://img.shields.io/badge/TypeScript-100%25-3178c6?style=for-the-badge&logo=typescript&logoColor=white" />
 <img src="https://img.shields.io/badge/NestJS-10-e0234e?style=for-the-badge&logo=nestjs&logoColor=white" />
-<img src="https://img.shields.io/badge/Next.js-16-000000?style=for-the-badge&logo=next.js&logoColor=white" />
-<img src="https://img.shields.io/badge/Groq-Llama_4-f97316?style=for-the-badge&logoColor=white" />
+<img src="https://img.shields.io/badge/Next.js-15-000000?style=for-the-badge&logo=next.js&logoColor=white" />
+<img src="https://img.shields.io/github/actions/workflow/status/marcelorayzen/rayzen-ai/ci.yml?branch=main&style=for-the-badge&label=CI" />
 
 <br /><br />
 
-<h1>⚡ Rayzen AI</h1>
+<h1>Rayzen AI</h1>
 
-<p><strong>Plataforma pessoal de IA com automação local, memória semântica,<br />geração de documentos, voz e execução de tarefas no PC.</strong></p>
-
-<p>Totalmente configurável via painel ou <code>rayzen.config.json</code> — sem tocar no código.</p>
+<p><strong>Personal AI platform combining semantic memory, PC automation,<br />document generation, and voice — built as a production-grade NestJS monorepo.</strong></p>
 
 </div>
 
 ---
 
-## ✨ Módulos
+## What does it solve?
 
-<table>
-<tr>
-<td width="50%">
-
-**💬 Chat**
-Streaming SSE com efeito typewriter e histórico de sessões persistido.
-
-</td>
-<td width="50%">
-
-**🧠 Brain**
-Memória semântica com pgvector — indexa GitHub, PDF, URL e aprende durante conversas.
-
-</td>
-</tr>
-<tr>
-<td>
-
-**🤖 Jarvis**
-Executa tarefas no PC: Git, Docker, VS Code, emails, screenshot, clipboard e mais.
-
-</td>
-<td>
-
-**📄 Doc Engine**
-Gera PDF com Puppeteer e DOCX com docxtemplater a partir de prompts.
-
-</td>
-</tr>
-<tr>
-<td>
-
-**✍️ Content Studio**
-Cria posts, threads, artigos e calendário editorial com IA.
-
-</td>
-<td>
-
-**🎙️ TTS / STT**
-Síntese de voz via Groq Orpheus. Transcrição com Whisper e auto-envio.
-
-</td>
-</tr>
-</table>
+| Scenario | Module | How |
+|---|---|---|
+| "What did I read about Docker last week?" | Memory | pgvector similarity search over indexed documents |
+| "Open VS Code and run git status" | Execution | BullMQ task dispatched to local PC Agent |
+| "Generate a PDF report from this data" | Document Processing | Puppeteer renders HTML → PDF |
+| "Write a LinkedIn post about this article" | Content Engine | LLM with high-creativity prompt, returns formatted text |
+| "Read that message back to me" | Voice | Groq PlayAI TTS, markdown-stripped, 800-char limit |
 
 ---
 
-## 🗂️ Estrutura do monorepo
+## Architecture
 
 ```
-rayzen-ai/
-├── apps/
-│   ├── api/              # NestJS + Fastify — backend principal
-│   │   └── src/modules/
-│   │       ├── orchestrator/    # classifica intent, roteia módulos
-│   │       ├── brain/           # memória semântica + pgvector
-│   │       ├── jarvis/          # despacha tarefas para o PC Agent
-│   │       ├── agent-bridge/    # fila BullMQ + polling
-│   │       ├── doc/             # Puppeteer + docxtemplater
-│   │       ├── content/         # content studio
-│   │       ├── tts/ stt/        # voz e transcrição
-│   │       ├── stats/           # tokens e sessões
-│   │       ├── auth/            # login JWT senha única
-│   │       └── config-panel/    # lê/escreve rayzen.config.json
-│   ├── web/              # Next.js 16 App Router — painel
-│   └── agent/            # PC Agent local (Node.js + TypeScript)
-│       ├── src/security/whitelist.ts   # guardrail principal
-│       └── src/actions/               # 23 ações implementadas
-├── packages/
-│   └── types/            # Task, Document, ChatMessage — tipos compartilhados
-├── infra/
-│   ├── nginx/
-│   └── litellm/config.yaml
-├── rayzen.config.json    # configuração central
-└── docker-compose.yml
+Browser (Next.js 15)  ·  PC Agent (Node.js local)
+        │                         │ BullMQ poll (3s)
+        │ HTTP / SSE               │
+┌───────▼─────────────────────────▼───────────────────────────┐
+│              OrchestratorModule  (intent router)             │
+│  classify() → { module, action, confidence }  temp=0        │
+│  handleMessage() → validate → route → stream reply          │
+└────┬──────────┬──────────┬──────────┬────────────┬──────────┘
+     │          │          │          │            │
+  Memory    Execution  Document   Content      Voice
+  Module    Module     Processing  Engine      Module
+  pgvector  BullMQ     Puppeteer  LiteLLM     Groq API
+     │                   DOCX
+     └──────── ValidationModule (cross-cutting) ──────────────┘
+                prompt injection · output schema · routing
+```
+
+See [docs/architecture.md](docs/architecture.md) for the full diagram and module catalogue.
+
+---
+
+## Technical differentials
+
+- **LiteLLM proxy** — provider-agnostic LLM layer; swap OpenAI ↔ Groq ↔ Anthropic in config, no code changes
+- **Whitelist-enforced PC Agent** — every local action is explicitly allow-listed; path traversal blocked; medium/high-risk actions run dry-run first
+- **Validation layer** — dedicated `ValidationModule` detects prompt injection and system-prompt leakage before any LLM call
+- **pgvector semantic memory** — 1024-dimension Jina embeddings stored in PostgreSQL; conversation itself is indexed for continuous learning
+- **Streaming SSE** — chat responses stream token-by-token with typewriter effect; session history persisted with per-call `tokens_used`
+
+---
+
+## Reliability
+
+**48 tests across 6 modules**, enforced in CI:
+
+| Module | What is tested |
+|---|---|
+| `ValidationService` | Prompt injection patterns, output schema, classification guard |
+| `SessionService` | Token aggregate stats, session groupBy, title truncation |
+| `VoiceService` | Markdown stripping before TTS, 800-char limit, error handling |
+| `MemoryService` | Checksum deduplication, embedding API call, search mapping |
+| `ExecutionService` | BullMQ job parameters, module field, timeout and failure paths |
+| `OrchestratorService` | Classification routing, module delegation, validation integration |
+
+```bash
+pnpm test:cov    # jest --coverage with enforced thresholds
+```
+
+See [docs/validation.md](docs/validation.md) for validation philosophy and coverage targets.
+
+---
+
+## Module structure
+
+```
+apps/api/src/modules/
+├── orchestrator/        # intent classification + routing + SSE
+├── memory/              # pgvector semantic search + document indexing
+├── execution/           # BullMQ task dispatch to PC Agent
+├── document-processing/ # Puppeteer PDF + docxtemplater DOCX
+├── content-engine/      # long-form content + editorial calendar
+├── voice/               # Groq TTS synthesis + Whisper STT
+├── session/             # conversation history + token stats
+├── validation/          # prompt injection + output validation
+├── configuration/       # system personality config
+├── agent-bridge/        # PC Agent authentication + queue
+└── auth/                # JWT authentication
 ```
 
 ---
 
-## 🚀 Setup rápido
+## Quick start
 
-### Pré-requisitos
-
-![Node](https://img.shields.io/badge/Node.js-20_LTS-339933?style=flat-square&logo=node.js&logoColor=white)
-![pnpm](https://img.shields.io/badge/pnpm-9.x-f69220?style=flat-square&logo=pnpm&logoColor=white)
-![Docker](https://img.shields.io/badge/Docker_Desktop-latest-2496ed?style=flat-square&logo=docker&logoColor=white)
-
-### Instalação
+**Prerequisites:** Node.js 20 LTS, pnpm 9.x, Docker Desktop
 
 ```bash
 git clone https://github.com/marcelorayzen/rayzen-ai.git
 cd rayzen-ai
 pnpm install
 cp .env.example .env
-# edite .env com suas chaves
+# Fill in API keys (see below)
 ```
 
-### Variáveis obrigatórias
+**Required environment variables:**
 
 ```bash
-GROQ_API_KEY=gsk_...           # groq.com — gratuito
-JINA_API_KEY=jina_...          # jina.ai — gratuito
-LITELLM_MASTER_KEY=sk-rayzen-qualquercoisa
-DATABASE_URL=postgresql://rayzen:senha@localhost:5432/rayzen_ai
+GROQ_API_KEY=gsk_...           # groq.com — free tier available
+JINA_API_KEY=jina_...          # jina.ai — free tier available
+LITELLM_MASTER_KEY=sk-rayzen-anything
+DATABASE_URL=postgresql://rayzen:password@localhost:5432/rayzen_ai
 REDIS_URL=redis://localhost:6379
 JWT_SECRET=<openssl rand -hex 32>
-ADMIN_PASSWORD=suasenha
+ADMIN_PASSWORD=yourpassword
 ```
 
-### Subir
+**Start:**
 
 ```bash
-# Infra
-docker compose up -d
+docker compose up -d   # PostgreSQL + Redis + LiteLLM
 
-# Banco
-pnpm db:migrate
+pnpm db:migrate        # Apply schema (pgvector extension required)
 
-# Dev (3 terminais)
-pnpm dev:api      # API  → http://localhost:3001
-pnpm dev:web      # Web  → http://localhost:3000
-pnpm dev:agent    # PC Agent (necessário para Jarvis)
+# Three terminals:
+pnpm dev:api           # API  → http://localhost:3001
+pnpm dev:web           # Web  → http://localhost:3000
+pnpm dev:agent         # PC Agent (required for Execution module)
 ```
 
-Acesse **http://localhost:3000** e faça login com `ADMIN_PASSWORD`.
+Open **http://localhost:3000** and log in with `ADMIN_PASSWORD`.
 
 ---
 
-## ⚙️ Configuração
-
-Edite `rayzen.config.json` na raiz ou use o painel em `/settings`:
-
-```json
-{
-  "identity": { "name": "Kai", "language": "pt-BR", "personality": "..." },
-  "modules":  { "brain": true, "jarvis": true, "doc": true },
-  "llm":      { "chat": { "model": "gpt-4o", "temperature": 0.7 } },
-  "agent":    { "actions": { "git_commit": true, "send_email": true } },
-  "tts":      { "provider": "groq", "voice": "daniel" }
-}
-```
-
-Ver [docs/personalization.md](docs/personalization.md) para todas as opções.
-
----
-
-## 🤖 PC Agent — ações disponíveis
-
-| Categoria | Ações |
-|---|---|
-| 🖥️ Apps | `open_app` `open_url` `open_vscode` |
-| 📁 Arquivos | `list_dir` `file_search` `organize_downloads` `create_project_folder` |
-| ⚙️ Sistema | `get_system_info` `screenshot` `notify` `clipboard_read` `clipboard_write` |
-| 🌿 Git | `git_status` `git_log` `git_branch` `git_commit` |
-| 💻 Terminal | `run_command` |
-| 🐳 Docker | `docker_ps` `docker_start` `docker_stop` |
-| 📧 Outlook | `read_emails` `send_email` `get_calendar` |
-
-Todas as ações são controladas por whitelist. Ver [docs/agent.md](docs/agent.md).
-
----
-
-## 🛠️ Comandos úteis
+## Development commands
 
 ```bash
-pnpm db:studio      # Prisma Studio — visualizar banco
-pnpm db:migrate     # aplicar migrations
-pnpm typecheck      # TypeScript em todo o monorepo
-pnpm lint           # ESLint
-pnpm build          # build de todos os apps
+pnpm typecheck      # TypeScript — zero errors target
+pnpm lint           # ESLint across all apps
+pnpm test           # Jest
+pnpm test:cov       # Jest with coverage report
+pnpm db:studio      # Prisma Studio at http://localhost:5555
+pnpm build          # Build all apps
 ```
 
 ---
 
-## 🏗️ Stack
+## Stack
 
-| Camada | Tecnologia | Versão |
+| Layer | Technology | Version |
 |---|---|---|
-| Frontend | Next.js App Router | 16.x |
+| Frontend | Next.js App Router | 15.x |
 | Backend | NestJS + Fastify | 10.x |
 | LLM proxy | LiteLLM | latest |
-| LLM provider | Groq (Llama 4) | — |
-| Embeddings | Jina AI (jina-embeddings-v3) | 1024 dim |
-| Banco | PostgreSQL + pgvector | 16 + 0.7 |
-| Cache / Fila | Redis + BullMQ | 7.x + 5.x |
+| Embeddings | Jina AI (jina-embeddings-v3) | 1024-dim |
+| Database | PostgreSQL + pgvector | 16 + 0.7 |
+| Cache / Queue | Redis + BullMQ | 7.x + 5.x |
 | ORM | Prisma | 5.x |
 | PDF | Puppeteer | 22.x |
 | DOCX | docxtemplater | 3.x |
+| Voice | Groq (PlayAI Astra TTS + Whisper) | — |
 | Agent | Node.js TypeScript | 20 LTS |
 | Container | Docker Compose | v2 |
-| VPS | Oracle Ampere A1 (free tier) | Ubuntu 24.04 |
+| VPS | Oracle Ampere A1 free tier | Ubuntu 24.04 |
 
 ---
 
-## 📚 Documentação
+## Documentation
 
-| Arquivo | Conteúdo |
+| File | Contents |
 |---|---|
-| [docs/getting-started.md](docs/getting-started.md) | Guia do zero para novos usuários |
-| [docs/personalization.md](docs/personalization.md) | Todas as opções de personalização |
-| [docs/agent.md](docs/agent.md) | PC Agent: guardrails, autonomia, adicionar ações |
-| [docs/diary.md](docs/diary.md) | Histórico de decisões técnicas e problemas resolvidos |
-| [ADR.md](ADR.md) | Registro de decisões de arquitetura |
+| [docs/architecture.md](docs/architecture.md) | System diagram, module catalogue, data stores, LiteLLM model assignments |
+| [docs/workflows.md](docs/workflows.md) | 5 end-to-end flows: memory indexing, routing, PC agent, voice, doc gen |
+| [docs/validation.md](docs/validation.md) | Validation philosophy, what is detected, coverage targets |
+| [docs/agent-runtime.md](docs/agent-runtime.md) | Security model, action catalogue, dry-run protocol, adding new actions |
+| [docs/getting-started.md](docs/getting-started.md) | Detailed setup guide |
+| [docs/personalization.md](docs/personalization.md) | System persona and behaviour configuration |
 
 ---
 
-## 🔗 Links locais (desenvolvimento)
+## Local dev URLs
 
-| Serviço | URL |
+| Service | URL |
 |---|---|
 | Web | http://localhost:3000 |
 | API / Swagger | http://localhost:3001/docs |
@@ -239,6 +202,6 @@ pnpm build          # build de todos os apps
 
 <div align="center">
 
-<sub>Feito por <a href="https://github.com/marcelorayzen">Marcelo Rayzen</a> · Stack 100% TypeScript · Powered by Groq + LiteLLM</sub>
+<sub>Built by <a href="https://github.com/marcelorayzen">Marcelo Rayzen</a> · 100% TypeScript · NestJS + Next.js monorepo</sub>
 
 </div>

@@ -14,6 +14,14 @@ function authHeaders(extra?: Record<string, string>): Record<string, string> {
 import { useRouter } from 'next/navigation'
 import ReactMarkdown from 'react-markdown'
 
+const MODULE_LABELS: Record<string, string> = {
+  brain:   'memory',
+  jarvis:  'execution',
+  doc:     'documents',
+  content: 'content-engine',
+  system:  'system',
+}
+
 interface Message {
   role: 'user' | 'assistant'
   content: string
@@ -262,7 +270,7 @@ export default function Home() {
         formData.append('file', blob, `audio.${mimeType.includes('webm') ? 'webm' : 'mp4'}`)
 
         try {
-          const res = await fetch(`${API_URL}/stt/transcribe`, {
+          const res = await fetch(`${API_URL}/voice/transcribe`, {
             method: 'POST',
             headers: authHeaders(),
             body: formData,
@@ -293,7 +301,7 @@ export default function Home() {
 
     setPlayingIndex(index)
     try {
-      const res = await fetch(`${API_URL}/tts/synthesize`, {
+      const res = await fetch(`${API_URL}/voice/synthesize`, {
         method: 'POST',
         headers: authHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ text }),
@@ -358,7 +366,7 @@ export default function Home() {
             continue
           }
 
-          if (data.module) currentModule = data.module
+          if (typeof data.module === 'string') currentModule = data.module
 
           if (data.text !== undefined) {
             if (currentModule) {
@@ -368,13 +376,13 @@ export default function Home() {
                 return updated
               })
             }
-            tokenQueueRef.current.push(data.text)
+            tokenQueueRef.current.push(data.text as string)
             drainQueue()
           }
 
-          if (data.tokensUsed !== undefined && data.tokensUsed > 0) {
-            setSessionTokens((prev) => prev + data.tokensUsed)
-            setDailyTokens((prev) => (prev ?? 0) + data.tokensUsed)
+          if (typeof data.tokensUsed === 'number' && data.tokensUsed > 0) {
+            setSessionTokens((prev) => prev + (data.tokensUsed as number))
+            setDailyTokens((prev) => (prev ?? 0) + (data.tokensUsed as number))
           }
         }
       }
@@ -670,7 +678,7 @@ export default function Home() {
               {msg.role === 'assistant' && (
                 <div className="mt-2 flex items-center gap-3">
                   {msg.module && (
-                    <span className="text-xs text-zinc-500">módulo: {msg.module}</span>
+                    <span className="text-xs text-zinc-500">módulo: {MODULE_LABELS[msg.module] ?? msg.module}</span>
                   )}
                   <button
                     onClick={() => playAudio(msg.content, i)}

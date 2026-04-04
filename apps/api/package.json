@@ -8,6 +8,9 @@
     "start": "node dist/main",
     "lint": "eslint src --ext .ts",
     "typecheck": "tsc --noEmit",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:cov": "jest --coverage",
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio",
     "db:generate": "prisma generate"
@@ -44,8 +47,46 @@
   "devDependencies": {
     "@nestjs/cli": "^10.0.0",
     "@nestjs/testing": "^10.0.0",
+    "@types/jest": "^29.5.14",
     "@types/pdf-parse": "^1.1.5",
+    "jest": "^29.7.0",
     "prisma": "^5.0.0",
+    "ts-jest": "^29.4.9",
     "typescript": "^5.4.0"
+  },
+  "jest": {
+    "moduleFileExtensions": [
+      "js",
+      "json",
+      "ts"
+    ],
+    "rootDir": "src",
+    "testRegex": ".*\\.spec\\.ts$",
+    "transform": {
+      "^.+\\.(t|j)s$": "ts-jest"
+    },
+    "collectCoverageFrom": [
+      "modules/validation/**/*.(t|j)s",
+      "modules/session/**/*.(t|j)s",
+      "modules/voice/**/*.(t|j)s",
+      "modules/memory/**/*.(t|j)s",
+      "modules/execution/**/*.(t|j)s",
+      "modules/orchestrator/**/*.(t|j)s",
+      "!**/*.module.ts",
+      "!**/*.controller.ts",
+      "!**/main.ts"
+    ],
+    "coverageThreshold": {
+      "global": {
+        "functions": 75,
+        "branches": 30,
+        "lines": 55
+      }
+    },
+    "coverageDirectory": "../coverage",
+    "testEnvironment": "node",
+    "moduleNameMapper": {
+      "^@rayzen/types$": "<rootDir>/../../packages/types/src/index.ts"
+    }
   }
 }

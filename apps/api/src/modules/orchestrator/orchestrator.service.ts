@@ -3,11 +3,12 @@ import { ConfigService } from '@nestjs/config'
 import { PrismaClient } from '@prisma/client'
 import OpenAI from 'openai'
 import { TaskModule, ChatMessage } from '@rayzen/types'
-import { BrainService } from '../brain/brain.service'
-import { DocService } from '../doc/doc.service'
-import { JarvisService } from '../jarvis/jarvis.service'
-import { ContentService } from '../content/content.service'
-import { ConfigPanelService } from '../config-panel/config-panel.service'
+import { MemoryService } from '../memory/memory.service'
+import { DocumentProcessingService } from '../document-processing/document-processing.service'
+import { ExecutionService } from '../execution/execution.service'
+import { ContentEngineService } from '../content-engine/content-engine.service'
+import { RayzenConfigService } from '../configuration/configuration.service'
+import { ValidationService } from '../validation/validation.service'
 import * as os from 'os'
 
 const HOME = process.env.USERPROFILE ?? process.env.HOME ?? os.homedir()
@@ -208,11 +209,12 @@ export class OrchestratorService {
 
   constructor(
     private config: ConfigService,
-    private brain: BrainService,
-    private doc: DocService,
-    private jarvis: JarvisService,
-    private content: ContentService,
-    private configPanel: ConfigPanelService,
+    private memory: MemoryService,
+    private documentProcessing: DocumentProcessingService,
+    private execution: ExecutionService,
+    private contentEngine: ContentEngineService,
+    private rayzenConfig: RayzenConfigService,
+    private validation: ValidationService,
   ) {
     this.llm = new OpenAI({
       baseURL: this.config.get('LITELLM_BASE_URL', 'http://localhost:4000/v1'),
@@ -222,7 +224,7 @@ export class OrchestratorService {
   }
 
   private getRayzenConfig() {
-    try { return this.configPanel.getConfig() } catch { return null }
+    try { return this.rayzenConfig.getConfig() } catch { return null }
   }
 
   private getSystemPrompt(module: string): string {
@@ -244,13 +246,16 @@ export class OrchestratorService {
   }
 
   async handleMessage(prompt: string, sessionId: string): Promise<OrchestrateResult> {
+    // 0. Validar prompt antes de qualquer processamento
+    this.validation.assertValidPrompt(prompt)
+
     // 1. Classificar intent
     const classify = await this.classify(prompt)
 
     // 2. Rotear para Brain se necessário
     if (classify.module === 'brain') {
       try {
-        const result = await this.brain.searchAndSynthesize(prompt, sessionId)
+        const result = await this.memory.searchAndSynthesize(prompt, sessionId)
         this.extractAndIndex(prompt, result.answer)
         return {
           reply: result.answer,
@@ -269,7 +274,7 @@ export class OrchestratorService {
     if (classify.module === 'jarvis') {
       try {
         const jarvisPayload = buildJarvisPayload(classify.action, prompt)
-        const result = await this.jarvis.dispatch(classify.action, jarvisPayload)
+        const result = await this.execution.dispatch(classify.action, jarvisPayload)
         // Sintetiza resposta natural a partir do resultado
         const synthesis = await this.llm.chat.completions.create({
           model: 'gpt-4o-mini',
@@ -312,7 +317,7 @@ Seja direto, claro e amigável. Português brasileiro. Sem JSON bruto.`,
       try {
         const isCalendar = classify.action === 'calendar' || prompt.toLowerCase().includes('calendário')
         if (isCalendar) {
-          const result = await this.content.generateCalendar(prompt, 7, sessionId)
+          const result = await this.contentEngine.generateCalendar(prompt, 7, sessionId)
           const formatted = result.entries
             .map((e) => `Dia ${e.day} — ${e.format.toUpperCase()}: ${e.theme}\n↳ ${e.hook}`)
             .join('\n\n')
@@ -327,7 +332,7 @@ Seja direto, claro e amigável. Português brasileiro. Sem JSON bruto.`,
         }
 
         const type = (['post', 'thread', 'article'].includes(classify.action) ? classify.action : 'post') as 'post' | 'thread' | 'article'
-        const result = await this.content.generate(type, prompt, 'professional', sessionId)
+        const result = await this.contentEngine.generate(type, prompt, 'professional', sessionId)
         return {
           reply: result.content,
           module: classify.module,
@@ -344,7 +349,7 @@ Seja direto, claro e amigável. Português brasileiro. Sem JSON bruto.`,
     // 5. Rotear para Doc se necessário
     if (classify.module === 'doc') {
       try {
-        const result = await this.doc.generatePDF(prompt, sessionId)
+        const result = await this.documentProcessing.generatePDF(prompt, sessionId)
         return {
           reply: `Documento gerado com sucesso: **${result.fileName}** (${Math.round(result.sizeBytes / 1024)}KB). Acesse via POST /doc/pdf para baixar.`,
           module: classify.module,
@@ -459,7 +464,7 @@ Seja criterioso — não memorize perguntas, comandos ou respostas genéricas.`,
       const extracted = JSON.parse(res.choices[0].message.content ?? '{"hasMemory":false}')
       if (extracted.hasMemory && extracted.content) {
         console.log('[extractAndIndex] indexando:', extracted.content)
-        await this.brain.indexDocument(extracted.content, extracted.sourcePath ?? 'memoria/auto', {
+        await this.memory.indexDocument(extracted.content, extracted.sourcePath ?? 'memoria/auto', {
           auto: true,
           originalPrompt: prompt.slice(0, 100),
         })

@@ -1,14 +1,15 @@
 import { Module } from '@nestjs/common'
 import { OrchestratorController } from './orchestrator.controller'
 import { OrchestratorService } from './orchestrator.service'
-import { BrainModule } from '../brain/brain.module'
-import { DocModule } from '../doc/doc.module'
-import { JarvisModule } from '../jarvis/jarvis.module'
-import { ContentModule } from '../content/content.module'
-import { ConfigPanelModule } from '../config-panel/config-panel.module'
+import { MemoryModule } from '../memory/memory.module'
+import { DocumentProcessingModule } from '../document-processing/document-processing.module'
+import { ExecutionModule } from '../execution/execution.module'
+import { ContentEngineModule } from '../content-engine/content-engine.module'
+import { ConfigurationModule } from '../configuration/configuration.module'
+import { ValidationModule } from '../validation/validation.module'
 
 @Module({
-  imports: [BrainModule, DocModule, JarvisModule, ContentModule, ConfigPanelModule],
+  imports: [MemoryModule, DocumentProcessingModule, ExecutionModule, ContentEngineModule, ConfigurationModule, ValidationModule],
   controllers: [OrchestratorController],
   providers: [OrchestratorService],
   exports: [OrchestratorService],

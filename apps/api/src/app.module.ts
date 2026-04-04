@@ -4,16 +4,16 @@ import { BullModule } from '@nestjs/bull'
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler'
 import { APP_GUARD } from '@nestjs/core'
 import { AuthModule } from './modules/auth/auth.module'
-import { ConfigPanelModule } from './modules/config-panel/config-panel.module'
+import { ConfigurationModule } from './modules/configuration/configuration.module'
 import { OrchestratorModule } from './modules/orchestrator/orchestrator.module'
 import { AgentBridgeModule } from './modules/agent-bridge/agent-bridge.module'
-import { BrainModule } from './modules/brain/brain.module'
-import { DocModule } from './modules/doc/doc.module'
-import { JarvisModule } from './modules/jarvis/jarvis.module'
-import { ContentModule } from './modules/content/content.module'
-import { StatsModule } from './modules/stats/stats.module'
-import { TtsModule } from './modules/tts/tts.module'
-import { SttModule } from './modules/stt/stt.module'
+import { MemoryModule } from './modules/memory/memory.module'
+import { DocumentProcessingModule } from './modules/document-processing/document-processing.module'
+import { ExecutionModule } from './modules/execution/execution.module'
+import { ContentEngineModule } from './modules/content-engine/content-engine.module'
+import { SessionModule } from './modules/session/session.module'
+import { VoiceModule } from './modules/voice/voice.module'
+import { ValidationModule } from './modules/validation/validation.module'
 
 @Module({
   imports: [
@@ -21,16 +21,16 @@ import { SttModule } from './modules/stt/stt.module'
     BullModule.forRoot({ redis: process.env.REDIS_URL }),
     ThrottlerModule.forRoot([{ ttl: 60000, limit: 120 }]),
     AuthModule,
-    ConfigPanelModule,
+    ConfigurationModule,
     OrchestratorModule,
     AgentBridgeModule,
-    BrainModule,
-    DocModule,
-    JarvisModule,
-    ContentModule,
-    StatsModule,
-    TtsModule,
-    SttModule,
+    MemoryModule,
+    DocumentProcessingModule,
+    ExecutionModule,
+    ContentEngineModule,
+    SessionModule,
+    VoiceModule,
+    ValidationModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })

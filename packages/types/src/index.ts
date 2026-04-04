@@ -1,6 +1,9 @@
 // Task types (shared entre API e Agent)
 export type TaskStatus = 'pending' | 'processing' | 'done' | 'failed'
+// TaskModule: valores literais NÃO mudam — usados em runtime pelo executor.ts e whitelist.ts do agent
 export type TaskModule = 'jarvis' | 'content' | 'doc' | 'brain' | 'system'
+// TaskDomain: alias semântico para uso em código novo
+export type TaskDomain = TaskModule
 
 export interface Task {
   id: string
@@ -28,7 +31,7 @@ export interface AgentCapability {
   allowedPaths?: string[]
 }
 
-// Brain types
+// Memory types (ex-Brain)
 export interface Document {
   id: string
   sourcePath: string
@@ -43,6 +46,33 @@ export interface SearchResult {
   document: Document
   score: number
   excerpt: string
+}
+
+// Voice types
+export interface VoiceSynthesisRequest {
+  text: string
+  voice?: string
+}
+
+export interface VoiceTranscriptionResult {
+  text: string
+  confidence?: number
+}
+
+// Validation types
+export type ValidationSeverity = 'low' | 'medium' | 'high'
+export type ValidationIssueType = 'prompt_injection' | 'output_hallucination' | 'schema_violation' | 'length_exceeded'
+
+export interface ValidationIssue {
+  type: ValidationIssueType
+  severity: ValidationSeverity
+  message: string
+}
+
+export interface ValidationResult {
+  valid: boolean
+  issues: ValidationIssue[]
+  score: number
 }
 
 // LLM types

@@ -62,7 +62,7 @@ export default function SettingsPage() {
   useEffect(() => {
     const token = localStorage.getItem('rayzen_token')
     if (!token) { router.push('/login'); return }
-    fetch(`${API_URL}/config`, { headers: authHeaders() })
+    fetch(`${API_URL}/configuration`, { headers: authHeaders() })
       .then((r) => r.json())
       .then((d) => setConfig(d as RayzenConfig))
       .catch(() => null)
@@ -72,7 +72,7 @@ export default function SettingsPage() {
     if (!config) return
     setSaving(true)
     try {
-      await fetch(`${API_URL}/config`, {
+      await fetch(`${API_URL}/configuration`, {
         method: 'PATCH',
         headers: authHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify(config),
