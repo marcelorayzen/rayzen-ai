@@ -1,6 +1,7 @@
 import { Controller, Get, Post, Body, Query } from '@nestjs/common'
 import { ApiTags, ApiOperation } from '@nestjs/swagger'
 import { EventService, CreateEventDto } from './event.service'
+import { SynthesisService } from '../synthesis/synthesis.service'
 
 // Payload enviado pelo hook do Claude Code via stdin
 interface CliHookPayload {
@@ -16,7 +17,10 @@ interface CliHookPayload {
 @ApiTags('events')
 @Controller('events')
 export class EventController {
-  constructor(private readonly events: EventService) {}
+  constructor(
+    private readonly events: EventService,
+    private readonly synthesis: SynthesisService,
+  ) {}
 
   @Post()
   @ApiOperation({ summary: 'Registrar evento manualmente' })
@@ -30,17 +34,24 @@ export class EventController {
     const projectId = payload.projectId ?? undefined
     const hookEvent = payload.hook_event_name ?? 'PostToolUse'
 
-    // Hook Stop — resume de sessão
-    if (hookEvent === 'Stop' && payload.transcript) {
-      const messageCount = payload.transcript.length
-      const lastMessages = payload.transcript.slice(-6).map(m => `${m.role}: ${String(m.content).slice(0, 120)}`).join('\n')
-      return this.events.create({
+    // Hook Stop — registra encerramento e dispara síntese em background
+    if (hookEvent === 'Stop') {
+      const messageCount = payload.transcript?.length ?? 0
+      await this.events.create({
         projectId,
         source: 'cli',
         type: 'note',
         content: `Sessão encerrada (${messageCount} mensagens)`,
-        metadata: { sessionId: payload.session_id, messageCount, lastMessages },
+        metadata: { sessionId: payload.session_id, messageCount },
       })
+
+      // Síntese assíncrona — não bloqueia o hook
+      if (payload.session_id) {
+        this.synthesis.synthesizeSession(payload.session_id, projectId)
+          .catch(() => null)
+      }
+
+      return { ok: true }
     }
 
     // Hook PostToolUse — captura por ferramenta

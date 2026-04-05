@@ -22,8 +22,23 @@ model Project {
   documents            Document[]
   conversationMessages ConversationMessage[]
   events               Event[]
+  sessionArtifacts     SessionArtifact[]
 
   @@map("projects")
+}
+
+model SessionArtifact {
+  id        String   @id @default(uuid())
+  projectId String?  @map("project_id")
+  sessionId String   @map("session_id")
+  type      String   @default("synthesis") // synthesis | summary
+  content   Json     // { summary, decisions[], next_steps[], learnings[] }
+  createdAt DateTime @default(now()) @map("created_at")
+
+  project Project? @relation(fields: [projectId], references: [id])
+
+  @@index([projectId, sessionId])
+  @@map("session_artifacts")
 }
 
 model Event {

@@ -50,6 +50,18 @@ interface ActivityEvent {
   ts: string
 }
 
+interface SynthesisArtifact {
+  id: string
+  sessionId: string
+  createdAt: string
+  content: {
+    summary: string
+    decisions: string[]
+    next_steps: string[]
+    learnings: string[]
+  }
+}
+
 type ImportTab = 'github' | 'file' | 'url'
 
 export default function Home() {
@@ -72,6 +84,10 @@ export default function Home() {
   const [activityOpen, setActivityOpen] = useState(false)
   const [activityEvents, setActivityEvents] = useState<ActivityEvent[]>([])
   const [activityLoading, setActivityLoading] = useState(false)
+  const [synthesisOpen, setSynthesisOpen] = useState(false)
+  const [synthesisArtifacts, setSynthesisArtifacts] = useState<SynthesisArtifact[]>([])
+  const [synthesisLoading, setSynthesisLoading] = useState(false)
+  const [synthesizing, setSynthesizing] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
   const [importTab, setImportTab] = useState<ImportTab>('github')
   const [importLoading, setImportLoading] = useState(false)
@@ -196,6 +212,31 @@ export default function Home() {
       setActivityLoading(false)
     }
   }, [activeProjectId])
+
+  const openSynthesis = useCallback(async () => {
+    setSynthesisOpen(true)
+    setSynthesisLoading(true)
+    try {
+      const qs = activeProjectId ? `?project_id=${activeProjectId}` : ''
+      const res = await fetch(`${API_URL}/synthesis/artifacts${qs}`, { headers: authHeaders() })
+      setSynthesisArtifacts(await res.json() as SynthesisArtifact[])
+    } catch { setSynthesisArtifacts([]) }
+    finally { setSynthesisLoading(false) }
+  }, [activeProjectId])
+
+  const synthesizeCurrent = useCallback(async () => {
+    setSynthesizing(true)
+    try {
+      const res = await fetch(`${API_URL}/synthesis/session`, {
+        method: 'POST',
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ sessionId, ...(activeProjectId ? { projectId: activeProjectId } : {}) }),
+      })
+      const artifact = await res.json() as SynthesisArtifact
+      setSynthesisArtifacts(prev => [artifact, ...prev])
+    } catch { /* silencioso */ }
+    finally { setSynthesizing(false) }
+  }, [sessionId, activeProjectId])
 
   const handleImportGithub = useCallback(async () => {
     if (!githubUser.trim()) return
@@ -500,6 +541,61 @@ export default function Home() {
         </div>
       )}
 
+      {/* Synthesis modal */}
+      {synthesisOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="fixed inset-0 bg-black/70" onClick={() => setSynthesisOpen(false)} />
+          <div className="relative z-50 w-full max-w-xl bg-zinc-900 border border-zinc-800 rounded-2xl p-6 mx-4 max-h-[85vh] flex flex-col">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-sm font-semibold">Síntese de sessões</h2>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={synthesizeCurrent}
+                  disabled={synthesizing}
+                  className="text-xs bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white px-3 py-1.5 rounded-lg transition-colors"
+                >
+                  {synthesizing ? 'Sintetizando…' : 'Sintetizar sessão atual'}
+                </button>
+                <button onClick={() => setSynthesisOpen(false)} className="text-zinc-500 hover:text-zinc-300 text-xs">fechar</button>
+              </div>
+            </div>
+            <div className="overflow-y-auto flex-1 space-y-4">
+              {synthesisLoading && <p className="text-zinc-500 text-xs text-center py-4">Carregando…</p>}
+              {!synthesisLoading && synthesisArtifacts.length === 0 && (
+                <p className="text-zinc-500 text-xs text-center py-4">Nenhuma síntese ainda. Clique em "Sintetizar sessão atual" para começar.</p>
+              )}
+              {synthesisArtifacts.map((a) => (
+                <div key={a.id} className="border border-zinc-800 rounded-xl p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] text-zinc-500 font-mono">{new Date(a.createdAt).toLocaleString('pt-BR')}</span>
+                    <span className="text-[10px] text-zinc-600 font-mono truncate ml-2">{a.sessionId.slice(0, 8)}…</span>
+                  </div>
+                  <p className="text-xs text-zinc-300">{a.content.summary}</p>
+                  {a.content.decisions.length > 0 && (
+                    <div>
+                      <p className="text-[10px] font-semibold text-indigo-400 mb-1">Decisões</p>
+                      <ul className="space-y-0.5">{a.content.decisions.map((d, i) => <li key={i} className="text-xs text-zinc-400">· {d}</li>)}</ul>
+                    </div>
+                  )}
+                  {a.content.next_steps.length > 0 && (
+                    <div>
+                      <p className="text-[10px] font-semibold text-amber-400 mb-1">Próximos passos</p>
+                      <ul className="space-y-0.5">{a.content.next_steps.map((s, i) => <li key={i} className="text-xs text-zinc-400">· {s}</li>)}</ul>
+                    </div>
+                  )}
+                  {a.content.learnings.length > 0 && (
+                    <div>
+                      <p className="text-[10px] font-semibold text-emerald-400 mb-1">Aprendizados</p>
+                      <ul className="space-y-0.5">{a.content.learnings.map((l, i) => <li key={i} className="text-xs text-zinc-400">· {l}</li>)}</ul>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Import modal */}
       {importOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -726,9 +822,14 @@ export default function Home() {
           <button
             onClick={openActivity}
             className="text-zinc-500 hover:text-zinc-300 transition-colors text-xs"
-            title="Atividade"
           >
             atividade
+          </button>
+          <button
+            onClick={openSynthesis}
+            className="text-zinc-500 hover:text-zinc-300 transition-colors text-xs"
+          >
+            síntese
           </button>
           <button
             onClick={() => {

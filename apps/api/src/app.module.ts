@@ -16,6 +16,7 @@ import { VoiceModule } from './modules/voice/voice.module'
 import { ValidationModule } from './modules/validation/validation.module'
 import { ProjectModule } from './modules/project/project.module'
 import { EventModule } from './modules/event/event.module'
+import { SynthesisModule } from './modules/synthesis/synthesis.module'
 
 @Module({
   imports: [
@@ -35,6 +36,7 @@ import { EventModule } from './modules/event/event.module'
     ValidationModule,
     ProjectModule,
     EventModule,
+    SynthesisModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
