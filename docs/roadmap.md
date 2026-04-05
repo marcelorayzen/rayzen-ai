@@ -223,10 +223,10 @@ Cada fase tem escopo mínimo e critério de done explícito. Nada avança sem o 
 | Fase 4 — Síntese de sessão | ✅ Concluído |
 | Fase 5 — Documentação viva | ✅ Concluído |
 | Fase 6 — Obsidian export | ✅ Concluído |
-| Fase 7 — Estado estruturado | 🔄 Em andamento |
-| Fase 8 — Confiança e rastreabilidade | 🔲 Não iniciado |
-| Fase 9 — Git-aware context | 🔲 Não iniciado |
-| Fase 10 — Inteligência proativa | 🔲 Não iniciado |
+| Fase 7 — Estado estruturado | ✅ Concluído |
+| Fase 8 — Confiança e rastreabilidade | ✅ Concluído |
+| Fase 9 — Git-aware context | ✅ Concluído |
+| Fase 10 — Inteligência proativa | ✅ Concluído |
 
 ---
 
