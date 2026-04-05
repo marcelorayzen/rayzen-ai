@@ -24,9 +24,10 @@ interface RayzenConfig {
     security: Record<string, boolean>
   }
   tts: { provider: string; voice: string }
+  obsidian: { vaultPath: string; vaultName: string }
 }
 
-type Tab = 'identity' | 'modules' | 'llm' | 'agent' | 'security' | 'tts'
+type Tab = 'identity' | 'modules' | 'llm' | 'agent' | 'security' | 'tts' | 'obsidian'
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'identity', label: 'Identidade' },
@@ -35,6 +36,7 @@ const TABS: { id: Tab; label: string }[] = [
   { id: 'agent',    label: 'Agent' },
   { id: 'security', label: 'Segurança' },
   { id: 'tts',      label: 'Voz' },
+  { id: 'obsidian', label: 'Obsidian' },
 ]
 
 const ACTION_LABELS: Record<string, string> = {
@@ -266,6 +268,27 @@ export default function SettingsPage() {
                   onChange={(e) => update(['tts', 'voice'], e.target.value)}
                   className="input" />
               </Field>
+            </>
+          )}
+
+          {activeTab === 'obsidian' && (
+            <>
+              <Field label="Caminho do vault" hint="Caminho absoluto da pasta do vault no sistema onde a API roda. Ex: C:/Users/marce/Documents/Obsidian/meu-vault">
+                <input value={config.obsidian?.vaultPath ?? ''}
+                  onChange={(e) => update(['obsidian', 'vaultPath'], e.target.value)}
+                  placeholder="C:/Users/marce/Documents/Obsidian/meu-vault"
+                  className="input" />
+              </Field>
+              <Field label="Nome do vault" hint="Nome exato do vault no Obsidian (usado para os deep links obsidian://open)">
+                <input value={config.obsidian?.vaultName ?? ''}
+                  onChange={(e) => update(['obsidian', 'vaultName'], e.target.value)}
+                  placeholder="meu-vault"
+                  className="input" />
+              </Field>
+              <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
+                <p className="text-xs text-zinc-500">Após salvar, os documentos gerados em <strong className="text-zinc-400">Documentação viva</strong> serão sincronizados para:</p>
+                <code className="block mt-2 text-xs text-indigo-400">{config.obsidian?.vaultPath ? `${config.obsidian.vaultPath}/Rayzen/<projeto>/` : '<vault path>/Rayzen/<projeto>/'}</code>
+              </div>
             </>
           )}
         </div>

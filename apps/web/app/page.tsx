@@ -101,6 +101,8 @@ export default function Home() {
   const [docsLoading, setDocsLoading] = useState(false)
   const [generatingDocs, setGeneratingDocs] = useState(false)
   const [activeDocType, setActiveDocType] = useState<string>('project_state')
+  const [syncing, setSyncing] = useState(false)
+  const [syncResult, setSyncResult] = useState<{ synced: number; conflicts: Array<{type: string; vaultModifiedAt: string}> } | null>(null)
   const [importOpen, setImportOpen] = useState(false)
   const [importTab, setImportTab] = useState<ImportTab>('github')
   const [importLoading, setImportLoading] = useState(false)
@@ -274,6 +276,21 @@ export default function Home() {
       setProjectDocs(await res.json() as ProjectDoc[])
     } catch { /* silencioso */ }
     finally { setGeneratingDocs(false) }
+  }, [activeProjectId])
+
+  const syncObsidian = useCallback(async (force = false) => {
+    if (!activeProjectId) return
+    setSyncing(true)
+    setSyncResult(null)
+    try {
+      const res = await fetch(`${API_URL}/obsidian/sync/${activeProjectId}${force ? '?force=true' : ''}`, {
+        method: 'POST',
+        headers: authHeaders(),
+      })
+      const data = await res.json() as { synced: Array<{type:string}>; conflicts: Array<{type:string; vaultModifiedAt:string}>; deepLinks: Record<string,string> }
+      setSyncResult({ synced: data.synced?.length ?? 0, conflicts: data.conflicts ?? [] })
+    } catch { /* silencioso */ }
+    finally { setSyncing(false) }
   }, [activeProjectId])
 
   const handleImportGithub = useCallback(async () => {
@@ -587,17 +604,47 @@ export default function Home() {
             {/* Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-800">
               <h2 className="text-sm font-semibold">Documentação viva</h2>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
                 <button
                   onClick={generateAllDocs}
                   disabled={generatingDocs}
+                  className="text-xs bg-zinc-700 hover:bg-zinc-600 disabled:opacity-40 text-zinc-200 px-3 py-1.5 rounded-lg transition-colors"
+                >
+                  {generatingDocs ? 'Gerando…' : 'Regenerar'}
+                </button>
+                <button
+                  onClick={() => syncObsidian(false)}
+                  disabled={syncing}
                   className="text-xs bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white px-3 py-1.5 rounded-lg transition-colors"
                 >
-                  {generatingDocs ? 'Gerando…' : 'Regenerar tudo'}
+                  {syncing ? 'Sincronizando…' : '⬡ Obsidian'}
                 </button>
-                <button onClick={() => setDocsOpen(false)} className="text-zinc-500 hover:text-zinc-300 text-xs">fechar</button>
+                <button onClick={() => { setDocsOpen(false); setSyncResult(null) }} className="text-zinc-500 hover:text-zinc-300 text-xs">fechar</button>
               </div>
             </div>
+            {/* Sync result / conflicts */}
+            {syncResult && (
+              <div className={`px-6 py-3 text-xs border-b border-zinc-800 ${syncResult.conflicts.length > 0 ? 'bg-amber-950/40' : 'bg-emerald-950/40'}`}>
+                {syncResult.conflicts.length === 0 ? (
+                  <span className="text-emerald-400">{syncResult.synced} arquivo(s) sincronizado(s) com sucesso.</span>
+                ) : (
+                  <div className="space-y-1">
+                    <p className="text-amber-400 font-medium">{syncResult.conflicts.length} conflito(s) detectado(s) — vault foi editado após a última geração:</p>
+                    {syncResult.conflicts.map(c => (
+                      <div key={c.type} className="flex items-center justify-between">
+                        <span className="text-zinc-400">{c.type} · editado em {new Date(c.vaultModifiedAt).toLocaleString('pt-BR')}</span>
+                        <button
+                          onClick={() => syncObsidian(true)}
+                          className="text-amber-400 hover:text-amber-300 underline ml-2"
+                        >
+                          sobrescrever
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
             {/* Tabs */}
             {(() => {
               const DOC_TABS = [

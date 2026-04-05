@@ -25,6 +25,10 @@ export interface RayzenConfig {
     provider: string
     voice: string
   }
+  obsidian: {
+    vaultPath: string
+    vaultName: string
+  }
 }
 
 const CONFIG_PATHS = [

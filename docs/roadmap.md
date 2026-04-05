@@ -152,12 +152,12 @@ Hooks do Claude Code: `~/.claude/settings.json` → campo `hooks` com `PostToolU
 
 | Fase | Status |
 |---|---|
-| Fase 1 — Project-aware | 🔲 Não iniciado |
-| Fase 2 — Event log | 🔲 Não iniciado |
-| Fase 3 — Hooks Claude Code | 🔲 Não iniciado |
-| Fase 4 — Síntese de sessão | 🔲 Não iniciado |
-| Fase 5 — Documentação viva | 🔲 Não iniciado |
-| Fase 6 — Obsidian export | 🔲 Não iniciado |
+| Fase 1 — Project-aware | ✅ Concluído |
+| Fase 2 — Event log | ✅ Concluído |
+| Fase 3 — Hooks Claude Code | ✅ Concluído |
+| Fase 4 — Síntese de sessão | ✅ Concluído |
+| Fase 5 — Documentação viva | ✅ Concluído |
+| Fase 6 — Obsidian export | ✅ Concluído |
 
 ---
 

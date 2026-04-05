@@ -18,6 +18,7 @@ import { ProjectModule } from './modules/project/project.module'
 import { EventModule } from './modules/event/event.module'
 import { SynthesisModule } from './modules/synthesis/synthesis.module'
 import { DocumentationModule } from './modules/documentation/documentation.module'
+import { ObsidianModule } from './modules/obsidian/obsidian.module'
 
 @Module({
   imports: [
@@ -39,6 +40,7 @@ import { DocumentationModule } from './modules/documentation/documentation.modul
     EventModule,
     SynthesisModule,
     DocumentationModule,
+    ObsidianModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
