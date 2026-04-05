@@ -20,6 +20,7 @@ import { SynthesisModule } from './modules/synthesis/synthesis.module'
 import { DocumentationModule } from './modules/documentation/documentation.module'
 import { ObsidianModule } from './modules/obsidian/obsidian.module'
 import { ProjectStateModule } from './modules/project-state/project-state.module'
+import { GitModule } from './modules/git/git.module'
 
 @Module({
   imports: [
@@ -43,6 +44,7 @@ import { ProjectStateModule } from './modules/project-state/project-state.module
     DocumentationModule,
     ObsidianModule,
     ProjectStateModule,
+    GitModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })

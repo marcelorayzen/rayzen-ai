@@ -32,6 +32,7 @@ export class SynthesisService {
       this.prisma.event.findMany({
         where: { metadata: { path: ['sessionId'], equals: sessionId } },
         orderBy: { ts: 'asc' },
+        select: { id: true, source: true, type: true, intent: true, content: true, metadata: true },
       }),
     ])
 
@@ -70,6 +71,7 @@ export class SynthesisService {
       this.prisma.event.findMany({
         where: { projectId, ts: { gte: since } },
         orderBy: { ts: 'asc' },
+        select: { id: true, source: true, type: true, intent: true, content: true, metadata: true },
       }),
       this.prisma.conversationMessage.findMany({
         where: { projectId, createdAt: { gte: since } },
@@ -104,9 +106,44 @@ export class SynthesisService {
     }
   }
 
+  private buildGitSummary(events: Array<{ metadata: unknown }>): string {
+    const commits: string[] = []
+    const files = new Set<string>()
+    const branches = new Set<string>()
+
+    for (const ev of events) {
+      const m = ev.metadata as Record<string, unknown> | null
+      if (!m) continue
+      const git = m['git'] as Record<string, unknown> | null
+      if (!git) continue
+
+      const branch = String(git['branch'] ?? '')
+      if (branch) branches.add(branch)
+
+      const hash = String(git['commitHash'] ?? '')
+      const msg = String(git['commitMessage'] ?? '')
+      if (hash && msg && !commits.find(c => c.includes(hash))) {
+        commits.push(`${hash} ${msg.slice(0, 80)}`)
+      }
+
+      const changed = (git['changedFiles'] as string[]) ?? []
+      changed.forEach(f => files.add(f))
+    }
+
+    if (branches.size === 0 && commits.length === 0) return ''
+
+    const lines = [
+      branches.size > 0 && `Branch(es): ${[...branches].join(', ')}`,
+      commits.length > 0 && `Commits: ${commits.slice(0, 5).join(' | ')}`,
+      files.size > 0 && `Arquivos tocados: ${[...files].slice(0, 10).join(', ')}`,
+    ].filter(Boolean)
+
+    return `## Contexto Git\n${lines.join('\n')}`
+  }
+
   private async runSynthesis(opts: {
     messages: Array<{ role: string; content: string }>
-    events: Array<{ source: string; type: string; intent?: string | null; content: string }>
+    events: Array<{ source: string; type: string; intent?: string | null; content: string; metadata: unknown }>
     label: string
     note?: string
   }): Promise<SynthesisResult> {
@@ -124,11 +161,14 @@ export class SynthesisService {
       .map(e => `[${e.intent ?? e.type}] ${e.content}`)
       .join('\n')
 
+    const gitSummary = this.buildGitSummary(opts.events)
+
     const context = [
       opts.note && `## Nota do usuário\n${opts.note}`,
       chatLines && `## Conversa\n${chatLines}`,
       cliLines && `## Ações no terminal\n${cliLines}`,
       manualLines && `## Registros manuais\n${manualLines}`,
+      gitSummary,
     ].filter(Boolean).join('\n\n')
 
     const totalItems = opts.messages.length + opts.events.length

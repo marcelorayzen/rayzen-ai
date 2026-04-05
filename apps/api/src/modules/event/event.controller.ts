@@ -4,6 +4,14 @@ import { EventService, CreateEventDto } from './event.service'
 import { SynthesisService } from '../synthesis/synthesis.service'
 import { PrismaClient } from '@prisma/client'
 
+interface GitContext {
+  branch?: string
+  commitHash?: string
+  commitMessage?: string
+  commitAuthor?: string
+  changedFiles?: string[]
+}
+
 // Payload enviado pelo hook do Claude Code via stdin
 interface CliHookPayload {
   hook_event_name?: string   // PostToolUse | Stop | Notification
@@ -12,7 +20,8 @@ interface CliHookPayload {
   tool_response?: unknown
   session_id?: string
   transcript?: Array<{ role: string; content: string }>
-  projectId?: string         // injetado pelo script do hook via RAYZEN_PROJECT_ID
+  projectId?: string         // injetado pelo script do hook
+  git?: GitContext           // enriquecido pelo hook (Fase 9)
 }
 
 @ApiTags('events')
@@ -44,8 +53,8 @@ export class EventController {
         projectId,
         source: 'cli',
         type: 'note',
-        content: `Sessão encerrada (${messageCount} mensagens)`,
-        metadata: { sessionId: payload.session_id, messageCount },
+        content: `Sessão encerrada (${messageCount} mensagens)${payload.git?.branch ? ` [${payload.git.branch}]` : ''}`,
+        metadata: { sessionId: payload.session_id, messageCount, git: payload.git ?? null },
       })
 
       // Síntese assíncrona — não bloqueia o hook
@@ -69,20 +78,22 @@ export class EventController {
     let content = ''
     let type: CreateEventDto['type'] = 'execution'
 
+    const gitSuffix = payload.git?.branch ? ` [${payload.git.branch}${payload.git.commitHash ? `@${payload.git.commitHash}` : ''}]` : ''
+
     if (tool === 'Edit' || tool === 'Write') {
       const filePath = (input['file_path'] as string) ?? (input['path'] as string) ?? 'arquivo'
-      content = `${tool}: ${filePath}`
+      content = `${tool}: ${filePath}${gitSuffix}`
       type = 'note'
     } else if (tool === 'Bash') {
       const cmd = String(input['command'] ?? '').slice(0, 200)
-      content = `Bash: ${cmd}`
+      content = `Bash: ${cmd}${gitSuffix}`
       type = 'execution'
     } else if (tool === 'Read') {
       const filePath = (input['file_path'] as string) ?? 'arquivo'
-      content = `Read: ${filePath}`
+      content = `Read: ${filePath}${gitSuffix}`
       type = 'note'
     } else {
-      content = `${tool}: ${JSON.stringify(input).slice(0, 150)}`
+      content = `${tool}: ${JSON.stringify(input).slice(0, 150)}${gitSuffix}`
     }
 
     return this.events.create({
@@ -90,7 +101,7 @@ export class EventController {
       source: 'cli',
       type,
       content,
-      metadata: { tool, input, sessionId: payload.session_id },
+      metadata: { tool, input, sessionId: payload.session_id, git: payload.git ?? null },
     })
   }
 

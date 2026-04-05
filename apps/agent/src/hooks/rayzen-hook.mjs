@@ -2,7 +2,9 @@
 /**
  * Rayzen AI — Claude Code Hook
  *
- * Recebe o payload do hook via stdin e envia para POST /events/cli.
+ * Recebe o payload do hook via stdin, enriquece com contexto git e envia
+ * para POST /events/cli.
+ *
  * Configurar em ~/.claude/settings.json (ver docs/roadmap.md Fase 3).
  *
  * Prioridade de configuração:
@@ -15,6 +17,7 @@ import { request as httpsRequest } from 'node:https'
 import { existsSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { join, dirname } from 'node:path'
+import { execSync } from 'node:child_process'
 
 const __dir = dirname(fileURLToPath(import.meta.url))
 const CONFIG_PATH = join(__dir, 'hook.config.mjs')
@@ -32,6 +35,40 @@ async function loadConfig() {
     apiUrl:    process.env.RAYZEN_API_URL    ?? cfg.apiUrl    ?? 'http://localhost:3001',
     apiToken:  process.env.RAYZEN_API_TOKEN  ?? cfg.apiToken  ?? '',
     projectId: process.env.RAYZEN_PROJECT_ID ?? cfg.projectId ?? '',
+  }
+}
+
+function getGitContext() {
+  try {
+    const branch = execSync('git rev-parse --abbrev-ref HEAD', {
+      encoding: 'utf8', timeout: 2000, stdio: ['pipe', 'pipe', 'ignore'],
+    }).trim()
+
+    const log = execSync('git log -1 --format=%H|||%s|||%an', {
+      encoding: 'utf8', timeout: 2000, stdio: ['pipe', 'pipe', 'ignore'],
+    }).trim()
+
+    const parts = log.split('|||')
+    const commitHash = parts[0]?.slice(0, 8) ?? ''
+    const commitMessage = parts[1]?.trim() ?? ''
+    const commitAuthor = parts[2]?.trim() ?? ''
+
+    // Arquivos modificados (staged + unstaged, sem deletados) — top 10
+    let changedFiles = []
+    try {
+      const filesRaw = execSync('git diff --name-only HEAD 2>/dev/null || git status --short --porcelain', {
+        encoding: 'utf8', timeout: 2000, stdio: ['pipe', 'pipe', 'ignore'],
+      }).trim()
+      changedFiles = filesRaw
+        .split('\n')
+        .map(l => l.replace(/^[MADRCU?! ]+/, '').trim())
+        .filter(Boolean)
+        .slice(0, 10)
+    } catch { /* ignora */ }
+
+    return { branch, commitHash, commitMessage, commitAuthor, changedFiles }
+  } catch {
+    return null
   }
 }
 
@@ -86,6 +123,10 @@ async function main() {
   }
 
   if (cfg.projectId) payload.projectId = cfg.projectId
+
+  // Enriquecer com contexto git (não bloqueia se falhar)
+  const git = getGitContext()
+  if (git) payload.git = git
 
   await post(`${cfg.apiUrl}/events/cli`, payload, cfg.apiToken)
   process.exit(0)

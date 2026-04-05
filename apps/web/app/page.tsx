@@ -84,6 +84,16 @@ interface ProjectState {
   updatedAt: string
 }
 
+interface GitContext {
+  branches: Record<string, number>
+  recentCommits: Array<{ hash: string; message: string; branch: string; ts: string }>
+  mostTouchedFiles: Array<{ file: string; count: number }>
+  lastBranch: string | null
+  lastCommitHash: string | null
+  lastCommitMessage: string | null
+  totalGitEvents: number
+}
+
 type QuickCaptureIntent = 'decision' | 'idea' | 'problem' | 'reference'
 
 interface DocVersion {
@@ -135,6 +145,8 @@ export default function Home() {
   const [projectState, setProjectState] = useState<ProjectState | null>(null)
   const [stateOpen, setStateOpen] = useState(false)
   const [stateRefreshing, setStateRefreshing] = useState(false)
+  const [gitContext, setGitContext] = useState<GitContext | null>(null)
+  const [gitOpen, setGitOpen] = useState(false)
   const [checkpointing, setCheckpointing] = useState(false)
   const [quickCaptureOpen, setQuickCaptureOpen] = useState(false)
   const [quickCaptureIntent, setQuickCaptureIntent] = useState<QuickCaptureIntent>('idea')
@@ -180,10 +192,12 @@ export default function Home() {
   useEffect(() => {
     if (activeProjectId) {
       loadProjectState(activeProjectId)
+      loadGitContext(activeProjectId)
     } else {
       setProjectState(null)
+      setGitContext(null)
     }
-  }, [activeProjectId, loadProjectState])
+  }, [activeProjectId, loadProjectState, loadGitContext])
 
   useEffect(() => {
     setSessionId(crypto.randomUUID())
@@ -355,6 +369,13 @@ export default function Home() {
     try {
       const res = await fetch(`${API_URL}/projects/${projectId}/state`, { headers: authHeaders() })
       if (res.ok) setProjectState(await res.json() as ProjectState)
+    } catch { /* silencioso */ }
+  }, [])
+
+  const loadGitContext = useCallback(async (projectId: string) => {
+    try {
+      const res = await fetch(`${API_URL}/projects/${projectId}/git`, { headers: authHeaders() })
+      if (res.ok) setGitContext(await res.json() as GitContext)
     } catch { /* silencioso */ }
   }, [])
 
@@ -750,6 +771,80 @@ export default function Home() {
         </div>
       )}
 
+      {/* Git context modal */}
+      {gitOpen && gitContext && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="fixed inset-0 bg-black/70" onClick={() => setGitOpen(false)} />
+          <div className="relative z-50 w-full max-w-lg bg-zinc-900 border border-zinc-800 rounded-2xl mx-4 max-h-[85vh] flex flex-col">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-800">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-semibold">Git context</span>
+                {gitContext.lastBranch && (
+                  <span className="text-[10px] bg-zinc-700 text-zinc-300 px-2 py-0.5 rounded font-mono">{gitContext.lastBranch}</span>
+                )}
+              </div>
+              <button onClick={() => setGitOpen(false)} className="text-zinc-500 hover:text-zinc-300 text-xs">fechar</button>
+            </div>
+            <div className="overflow-y-auto flex-1 px-6 py-4 space-y-5">
+              {gitContext.lastCommitHash && (
+                <div>
+                  <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wide mb-1">Último commit</p>
+                  <p className="text-xs font-mono text-zinc-300">
+                    <span className="text-indigo-400">{gitContext.lastCommitHash}</span>
+                    {' '}{gitContext.lastCommitMessage}
+                  </p>
+                </div>
+              )}
+              {Object.keys(gitContext.branches).length > 0 && (
+                <div>
+                  <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wide mb-2">Branches ativas</p>
+                  <div className="space-y-1">
+                    {Object.entries(gitContext.branches)
+                      .sort((a, b) => b[1] - a[1])
+                      .map(([branch, count]) => (
+                        <div key={branch} className="flex items-center justify-between">
+                          <span className="text-xs font-mono text-zinc-300">{branch}</span>
+                          <span className="text-[10px] text-zinc-600">{count} eventos</span>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              )}
+              {gitContext.recentCommits.length > 0 && (
+                <div>
+                  <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wide mb-2">Commits recentes</p>
+                  <div className="space-y-2">
+                    {gitContext.recentCommits.map((c, i) => (
+                      <div key={i} className="flex gap-2">
+                        <span className="text-[10px] font-mono text-indigo-400 shrink-0 pt-0.5">{c.hash}</span>
+                        <div className="min-w-0">
+                          <p className="text-xs text-zinc-300 truncate">{c.message}</p>
+                          <p className="text-[10px] text-zinc-600">{c.branch} · {new Date(c.ts).toLocaleString('pt-BR')}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {gitContext.mostTouchedFiles.length > 0 && (
+                <div>
+                  <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wide mb-2">Arquivos mais alterados</p>
+                  <div className="space-y-1">
+                    {gitContext.mostTouchedFiles.map(({ file, count }) => (
+                      <div key={file} className="flex items-center justify-between">
+                        <span className="text-[11px] font-mono text-zinc-400 truncate max-w-[80%]">{file}</span>
+                        <span className="text-[10px] text-zinc-600 shrink-0 ml-2">{count}×</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <p className="text-[10px] text-zinc-700">{gitContext.totalGitEvents} eventos com contexto git</p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Project State modal */}
       {stateOpen && projectState && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -888,23 +983,35 @@ export default function Home() {
               {!activityLoading && activityEvents.length === 0 && (
                 <p className="text-zinc-500 text-xs text-center py-4">Nenhum evento registrado ainda.</p>
               )}
-              {activityEvents.map((ev) => (
-                <div key={ev.id} className="flex gap-3 py-2 border-b border-zinc-800 last:border-0">
-                  <div className="flex flex-col items-center gap-1 min-w-[56px]">
-                    <span className="text-[10px] text-zinc-500 font-mono">{ev.source}</span>
-                    <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-medium ${
-                      ev.type === 'message' ? 'bg-indigo-900 text-indigo-300' :
-                      ev.type === 'index'   ? 'bg-emerald-900 text-emerald-300' :
-                      ev.type === 'execution' ? 'bg-amber-900 text-amber-300' :
-                      'bg-zinc-800 text-zinc-400'
-                    }`}>{ev.type}</span>
+              {activityEvents.map((ev) => {
+                const git = (ev.metadata as Record<string, unknown>)?.['git'] as Record<string, unknown> | null
+                return (
+                  <div key={ev.id} className="flex gap-3 py-2 border-b border-zinc-800 last:border-0">
+                    <div className="flex flex-col items-center gap-1 min-w-[56px]">
+                      <span className="text-[10px] text-zinc-500 font-mono">{ev.source}</span>
+                      <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-medium ${
+                        ev.type === 'message'   ? 'bg-indigo-900 text-indigo-300' :
+                        ev.type === 'index'     ? 'bg-emerald-900 text-emerald-300' :
+                        ev.type === 'execution' ? 'bg-amber-900 text-amber-300' :
+                        ev.type === 'decision'  ? 'bg-purple-900 text-purple-300' :
+                        'bg-zinc-800 text-zinc-400'
+                      }`}>{ev.type}</span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs text-zinc-300 truncate">{ev.content}</p>
+                      <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                        <span className="text-[10px] text-zinc-600">{new Date(ev.ts).toLocaleString('pt-BR')}</span>
+                        {git?.['branch'] && (
+                          <span className="text-[10px] font-mono text-indigo-400">⎇ {String(git['branch'])}</span>
+                        )}
+                        {git?.['commitHash'] && (
+                          <span className="text-[10px] font-mono text-zinc-600">{String(git['commitHash'])}</span>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs text-zinc-300 truncate">{ev.content}</p>
-                    <p className="text-[10px] text-zinc-600 mt-0.5">{new Date(ev.ts).toLocaleString('pt-BR')}</p>
-                  </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           </div>
         </div>
@@ -1323,6 +1430,15 @@ export default function Home() {
             >
               <div className={`w-2 h-2 rounded-full ${RISK_COLORS[projectState.riskLevel]}`} />
               {STAGE_LABELS[projectState.stage] ?? projectState.stage}
+            </button>
+          )}
+          {activeProjectId && gitContext && gitContext.lastBranch && (
+            <button
+              onClick={() => setGitOpen(true)}
+              className="flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-300 transition-colors font-mono"
+              title="Ver contexto git do projeto"
+            >
+              ⎇ {gitContext.lastBranch}
             </button>
           )}
           {activeProjectId && (
