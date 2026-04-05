@@ -35,6 +35,12 @@ interface Session {
   title: string
 }
 
+interface Project {
+  id: string
+  name: string
+  status: string
+}
+
 type ImportTab = 'github' | 'file' | 'url'
 
 export default function Home() {
@@ -52,6 +58,8 @@ export default function Home() {
   const [loadingSession, setLoadingSession] = useState<string | null>(null)
   const [deletingSession, setDeletingSession] = useState<string | null>(null)
   const router = useRouter()
+  const [projects, setProjects] = useState<Project[]>([])
+  const [activeProjectId, setActiveProjectId] = useState<string | null>(null)
   const [importOpen, setImportOpen] = useState(false)
   const [importTab, setImportTab] = useState<ImportTab>('github')
   const [importLoading, setImportLoading] = useState(false)
@@ -79,6 +87,13 @@ export default function Home() {
     fetch(`${API_URL}/sessions/tokens`, { headers: authHeaders() })
       .then((r) => r.json())
       .then((d) => setDailyTokens(d.last24h?.tokens ?? 0))
+      .catch(() => null)
+  }, [])
+
+  useEffect(() => {
+    fetch(`${API_URL}/projects`, { headers: authHeaders() })
+      .then((r) => r.json())
+      .then((d) => setProjects(d as Project[]))
       .catch(() => null)
   }, [])
 
@@ -336,7 +351,7 @@ export default function Home() {
       const res = await fetch(`${API_URL}/orchestrate/stream`, {
         method: 'POST',
         headers: authHeaders({ 'Content-Type': 'application/json' }),
-        body: JSON.stringify({ prompt: userMessage, sessionId }),
+        body: JSON.stringify({ prompt: userMessage, sessionId, ...(activeProjectId ? { projectId: activeProjectId } : {}) }),
       })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
 
@@ -629,6 +644,18 @@ export default function Home() {
           </div>
         </div>
         <div className="flex items-center gap-3">
+          {projects.length > 0 && (
+            <select
+              value={activeProjectId ?? ''}
+              onChange={(e) => setActiveProjectId(e.target.value || null)}
+              className="bg-zinc-800 border border-zinc-700 text-zinc-300 text-xs rounded-lg px-2 py-1.5 focus:outline-none focus:border-zinc-500"
+            >
+              <option value="">sem projeto</option>
+              {projects.filter((p) => p.status === 'active').map((p) => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+          )}
           <button
             onClick={() => {
               document.cookie = 'rayzen_token=; path=/; max-age=0'

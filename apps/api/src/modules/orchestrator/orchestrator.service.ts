@@ -245,7 +245,7 @@ export class OrchestratorService {
     return `Você é ${name}. ${personality}\n${roles[module] ?? ''}\nIdioma: ${langLabel}.`
   }
 
-  async handleMessage(prompt: string, sessionId: string): Promise<OrchestrateResult> {
+  async handleMessage(prompt: string, sessionId: string, projectId?: string): Promise<OrchestrateResult> {
     // 0. Validar prompt antes de qualquer processamento
     this.validation.assertValidPrompt(prompt)
 
@@ -391,8 +391,8 @@ Seja direto, claro e amigável. Português brasileiro. Sem JSON bruto.`,
     // 4. Salvar mensagens no banco
     await this.prisma.conversationMessage.createMany({
       data: [
-        { sessionId, module: classify.module, role: 'user', content: prompt },
-        { sessionId, module: classify.module, role: 'assistant', content: reply, tokensUsed },
+        { sessionId, module: classify.module, role: 'user', content: prompt, projectId },
+        { sessionId, module: classify.module, role: 'assistant', content: reply, tokensUsed, projectId },
       ],
     })
 
@@ -474,7 +474,7 @@ Seja criterioso — não memorize perguntas, comandos ou respostas genéricas.`,
     }
   }
 
-  async streamChat(prompt: string, sessionId: string, module: string, onToken: (token: string) => void): Promise<void> {
+  async streamChat(prompt: string, sessionId: string, module: string, onToken: (token: string) => void, projectId?: string): Promise<void> {
     const history = await this.prisma.conversationMessage.findMany({
       where: { sessionId },
       orderBy: { createdAt: 'asc' },
@@ -510,8 +510,8 @@ Seja criterioso — não memorize perguntas, comandos ou respostas genéricas.`,
 
     await this.prisma.conversationMessage.createMany({
       data: [
-        { sessionId, module, role: 'user', content: prompt },
-        { sessionId, module, role: 'assistant', content: fullReply, tokensUsed },
+        { sessionId, module, role: 'user', content: prompt, projectId },
+        { sessionId, module, role: 'assistant', content: fullReply, tokensUsed, projectId },
       ],
     })
 

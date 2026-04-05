@@ -14,6 +14,7 @@ import { ContentEngineModule } from './modules/content-engine/content-engine.mod
 import { SessionModule } from './modules/session/session.module'
 import { VoiceModule } from './modules/voice/voice.module'
 import { ValidationModule } from './modules/validation/validation.module'
+import { ProjectModule } from './modules/project/project.module'
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { ValidationModule } from './modules/validation/validation.module'
     SessionModule,
     VoiceModule,
     ValidationModule,
+    ProjectModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
