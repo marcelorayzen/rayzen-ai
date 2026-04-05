@@ -15,6 +15,7 @@ import { SessionModule } from './modules/session/session.module'
 import { VoiceModule } from './modules/voice/voice.module'
 import { ValidationModule } from './modules/validation/validation.module'
 import { ProjectModule } from './modules/project/project.module'
+import { EventModule } from './modules/event/event.module'
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { ProjectModule } from './modules/project/project.module'
     VoiceModule,
     ValidationModule,
     ProjectModule,
+    EventModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })

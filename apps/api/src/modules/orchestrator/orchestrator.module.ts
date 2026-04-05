@@ -7,9 +7,10 @@ import { ExecutionModule } from '../execution/execution.module'
 import { ContentEngineModule } from '../content-engine/content-engine.module'
 import { ConfigurationModule } from '../configuration/configuration.module'
 import { ValidationModule } from '../validation/validation.module'
+import { EventModule } from '../event/event.module'
 
 @Module({
-  imports: [MemoryModule, DocumentProcessingModule, ExecutionModule, ContentEngineModule, ConfigurationModule, ValidationModule],
+  imports: [MemoryModule, DocumentProcessingModule, ExecutionModule, ContentEngineModule, ConfigurationModule, ValidationModule, EventModule],
   controllers: [OrchestratorController],
   providers: [OrchestratorService],
   exports: [OrchestratorService],

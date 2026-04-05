@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config'
 import { PrismaClient } from '@prisma/client'
 import OpenAI from 'openai'
 import { createHash } from 'crypto'
+import { EventService } from '../event/event.service'
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const pdfParse = require('pdf-parse') as (buf: Buffer) => Promise<{ text: string }>
 
@@ -29,7 +30,10 @@ export interface SearchSynthesis {
 export class MemoryService {
   private prisma: PrismaClient
 
-  constructor(private config: ConfigService) {
+  constructor(
+    private config: ConfigService,
+    private eventService: EventService,
+  ) {
     this.prisma = new PrismaClient()
   }
 
@@ -224,6 +228,7 @@ Língua: português brasileiro.`,
       indexed++
     }
 
+    this.eventService.create({ source: 'memory', type: 'index', content: `GitHub @${username}`, metadata: { indexed, repos: repos.length } }).catch(() => null)
     return { indexed, repos: repos.length }
   }
 
@@ -244,6 +249,7 @@ Língua: português brasileiro.`,
       await this.indexDocument(chunk, path, { type: 'file', filename })
     }
 
+    this.eventService.create({ source: 'memory', type: 'index', content: `Arquivo: ${filename}`, metadata: { indexed: chunks.length, filename } }).catch(() => null)
     return { indexed: chunks.length }
   }
 

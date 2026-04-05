@@ -3,13 +3,17 @@ import { InjectQueue } from '@nestjs/bull'
 import { Queue } from 'bull'
 import { Task, TaskCreateDto } from '@rayzen/types'
 import { randomUUID } from 'crypto'
+import { EventService } from '../event/event.service'
 
 const POLL_INTERVAL_MS = 500
 const POLL_TIMEOUT_MS = 30_000
 
 @Injectable()
 export class ExecutionService {
-  constructor(@InjectQueue('agent-tasks') private queue: Queue) {}
+  constructor(
+    @InjectQueue('agent-tasks') private queue: Queue,
+    private eventService: EventService,
+  ) {}
 
   async dispatch(action: string, payload: Record<string, unknown>): Promise<unknown> {
     const dto: TaskCreateDto = { module: 'jarvis', action, payload }
@@ -25,6 +29,7 @@ export class ExecutionService {
       removeOnFail: false,
     })
 
+    this.eventService.create({ source: 'execution', type: 'execution', content: `${action}`, metadata: { action, payload, jobId: id } }).catch(() => null)
     return this.waitForResult(id)
   }
 

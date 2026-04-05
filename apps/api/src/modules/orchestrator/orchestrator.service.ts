@@ -9,6 +9,7 @@ import { ExecutionService } from '../execution/execution.service'
 import { ContentEngineService } from '../content-engine/content-engine.service'
 import { RayzenConfigService } from '../configuration/configuration.service'
 import { ValidationService } from '../validation/validation.service'
+import { EventService } from '../event/event.service'
 import * as os from 'os'
 
 const HOME = process.env.USERPROFILE ?? process.env.HOME ?? os.homedir()
@@ -215,6 +216,7 @@ export class OrchestratorService {
     private contentEngine: ContentEngineService,
     private rayzenConfig: RayzenConfigService,
     private validation: ValidationService,
+    private eventService: EventService,
   ) {
     this.llm = new OpenAI({
       baseURL: this.config.get('LITELLM_BASE_URL', 'http://localhost:4000/v1'),
@@ -399,6 +401,15 @@ Seja direto, claro e amigável. Português brasileiro. Sem JSON bruto.`,
     // 5. Extrair e indexar memória em background (sem bloquear resposta)
     this.extractAndIndex(prompt, reply)
 
+    // 6. Emitir evento de chat
+    this.eventService.create({
+      projectId,
+      source: 'chat',
+      type: 'message',
+      content: prompt,
+      metadata: { module: classify.module, action: classify.action, sessionId, tokensUsed },
+    }).catch(() => null)
+
     return {
       reply,
       module: classify.module,
@@ -517,6 +528,15 @@ Seja criterioso — não memorize perguntas, comandos ou respostas genéricas.`,
 
     // Extrair e indexar memória em background
     this.extractAndIndex(prompt, fullReply)
+
+    // Emitir evento de chat
+    this.eventService.create({
+      projectId,
+      source: 'chat',
+      type: 'message',
+      content: prompt,
+      metadata: { module, sessionId, tokensUsed },
+    }).catch(() => null)
   }
 
   async chat(messages: ChatMessage[], systemPrompt: string): Promise<string> {

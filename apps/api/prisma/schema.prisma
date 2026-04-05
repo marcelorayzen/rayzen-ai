@@ -21,8 +21,24 @@ model Project {
 
   documents            Document[]
   conversationMessages ConversationMessage[]
+  events               Event[]
 
   @@map("projects")
+}
+
+model Event {
+  id        String   @id @default(uuid())
+  projectId String?  @map("project_id")
+  source    String   // chat | memory | cli | voice | execution | manual
+  type      String   // message | index | execution | decision | note | error
+  content   String
+  metadata  Json     @default("{}")
+  ts        DateTime @default(now())
+
+  project Project? @relation(fields: [projectId], references: [id])
+
+  @@index([projectId, ts(sort: Desc)])
+  @@map("events")
 }
 
 model Document {
