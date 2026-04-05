@@ -23,7 +23,8 @@ async function loadConfig() {
   let cfg = {}
   if (existsSync(CONFIG_PATH)) {
     try {
-      const mod = await import(CONFIG_PATH)
+      const fileUrl = new URL(`file:///${CONFIG_PATH.replace(/\\/g, '/')}`)
+      const mod = await import(fileUrl.href)
       cfg = mod.default ?? {}
     } catch { /* ignora */ }
   }
