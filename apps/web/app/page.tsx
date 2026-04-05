@@ -96,6 +96,16 @@ interface GitContext {
 
 type QuickCaptureIntent = 'decision' | 'idea' | 'problem' | 'reference'
 
+interface Recommendation {
+  id: string
+  type: string
+  title: string
+  description: string
+  priority: 'low' | 'medium' | 'high'
+  action: string | null
+  computedAt: string
+}
+
 interface DocVersion {
   id: string
   content: string
@@ -147,6 +157,10 @@ export default function Home() {
   const [stateRefreshing, setStateRefreshing] = useState(false)
   const [gitContext, setGitContext] = useState<GitContext | null>(null)
   const [gitOpen, setGitOpen] = useState(false)
+  const [recommendations, setRecommendations] = useState<Recommendation[]>([])
+  const [recsOpen, setRecsOpen] = useState(false)
+  const [recsLoading, setRecsLoading] = useState(false)
+  const [dismissing, setDismissing] = useState<string | null>(null)
   const [checkpointing, setCheckpointing] = useState(false)
   const [quickCaptureOpen, setQuickCaptureOpen] = useState(false)
   const [quickCaptureIntent, setQuickCaptureIntent] = useState<QuickCaptureIntent>('idea')
@@ -193,11 +207,13 @@ export default function Home() {
     if (activeProjectId) {
       loadProjectState(activeProjectId)
       loadGitContext(activeProjectId)
+      loadRecommendations(activeProjectId)
     } else {
       setProjectState(null)
       setGitContext(null)
+      setRecommendations([])
     }
-  }, [activeProjectId, loadProjectState, loadGitContext])
+  }, [activeProjectId, loadProjectState, loadGitContext, loadRecommendations])
 
   useEffect(() => {
     setSessionId(crypto.randomUUID())
@@ -378,6 +394,43 @@ export default function Home() {
       if (res.ok) setGitContext(await res.json() as GitContext)
     } catch { /* silencioso */ }
   }, [])
+
+  const loadRecommendations = useCallback(async (projectId: string) => {
+    try {
+      const res = await fetch(`${API_URL}/projects/${projectId}/recommendations`, { headers: authHeaders() })
+      if (res.ok) {
+        const data = await res.json() as Recommendation[]
+        setRecommendations(data.filter(r => r.type !== 'all_clear'))
+      }
+    } catch { /* silencioso */ }
+  }, [])
+
+  const openRecommendations = useCallback(async () => {
+    if (!activeProjectId) return
+    setRecsOpen(true)
+    setRecsLoading(true)
+    try {
+      const res = await fetch(`${API_URL}/projects/${activeProjectId}/recommendations`, { headers: authHeaders() })
+      if (res.ok) {
+        const data = await res.json() as Recommendation[]
+        setRecommendations(data.filter(r => r.type !== 'all_clear'))
+      }
+    } catch { /* silencioso */ }
+    finally { setRecsLoading(false) }
+  }, [activeProjectId])
+
+  const dismissRec = useCallback(async (recId: string) => {
+    if (!activeProjectId) return
+    setDismissing(recId)
+    try {
+      await fetch(`${API_URL}/projects/${activeProjectId}/recommendations/${recId}/dismiss`, {
+        method: 'POST',
+        headers: authHeaders(),
+      })
+      setRecommendations(prev => prev.filter(r => r.id !== recId))
+    } catch { /* silencioso */ }
+    finally { setDismissing(null) }
+  }, [activeProjectId])
 
   const refreshProjectState = useCallback(async () => {
     if (!activeProjectId) return
@@ -763,6 +816,61 @@ export default function Home() {
                         <pre className="text-[11px] text-zinc-400 whitespace-pre-wrap font-mono leading-relaxed">{v.content}</pre>
                       </div>
                     </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Recommendations modal */}
+      {recsOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="fixed inset-0 bg-black/70" onClick={() => setRecsOpen(false)} />
+          <div className="relative z-50 w-full max-w-lg bg-zinc-900 border border-zinc-800 rounded-2xl mx-4 max-h-[85vh] flex flex-col">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-800">
+              <h2 className="text-sm font-semibold">Recomendações</h2>
+              <button onClick={() => setRecsOpen(false)} className="text-zinc-500 hover:text-zinc-300 text-xs">fechar</button>
+            </div>
+            <div className="overflow-y-auto flex-1 px-6 py-4 space-y-3">
+              {recsLoading && <p className="text-zinc-500 text-xs text-center py-8">Analisando projeto…</p>}
+              {!recsLoading && recommendations.length === 0 && (
+                <div className="text-center py-8">
+                  <p className="text-emerald-400 text-sm font-medium">Tudo em ordem</p>
+                  <p className="text-zinc-500 text-xs mt-1">Nenhuma inconsistência ou ação urgente identificada.</p>
+                </div>
+              )}
+              {recommendations.map((rec) => (
+                <div key={rec.id} className={`border rounded-xl p-4 space-y-2 ${
+                  rec.priority === 'high'   ? 'border-red-800 bg-red-950/30' :
+                  rec.priority === 'medium' ? 'border-amber-800 bg-amber-950/20' :
+                                              'border-zinc-800 bg-zinc-900'
+                }`}>
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-semibold uppercase ${
+                        rec.priority === 'high'   ? 'bg-red-900 text-red-300' :
+                        rec.priority === 'medium' ? 'bg-amber-900 text-amber-300' :
+                                                    'bg-zinc-700 text-zinc-400'
+                      }`}>{rec.priority}</span>
+                      <span className="text-[10px] text-zinc-600 font-mono">{rec.type}</span>
+                    </div>
+                    <button
+                      onClick={() => dismissRec(rec.id)}
+                      disabled={dismissing === rec.id}
+                      className="text-zinc-600 hover:text-zinc-400 text-xs transition-colors disabled:opacity-40 shrink-0"
+                      title="Descartar"
+                    >
+                      {dismissing === rec.id ? '…' : '×'}
+                    </button>
+                  </div>
+                  <p className="text-xs font-medium text-zinc-200">{rec.title}</p>
+                  <p className="text-xs text-zinc-400">{rec.description}</p>
+                  {rec.action && (
+                    <p className="text-[10px] text-zinc-500 border-t border-zinc-800 pt-2 mt-1">
+                      → {rec.action}
+                    </p>
                   )}
                 </div>
               ))}
@@ -1439,6 +1547,22 @@ export default function Home() {
               title="Ver contexto git do projeto"
             >
               ⎇ {gitContext.lastBranch}
+            </button>
+          )}
+          {activeProjectId && (
+            <button
+              onClick={openRecommendations}
+              className="relative flex items-center gap-1 text-xs text-zinc-500 hover:text-zinc-300 transition-colors"
+              title="Recomendações proativas"
+            >
+              {recommendations.length > 0 && (
+                <span className={`flex items-center justify-center w-4 h-4 rounded-full text-[9px] font-bold ${
+                  recommendations.some(r => r.priority === 'high')   ? 'bg-red-500 text-white' :
+                  recommendations.some(r => r.priority === 'medium') ? 'bg-amber-500 text-zinc-900' :
+                                                                       'bg-zinc-600 text-zinc-300'
+                }`}>{recommendations.length}</span>
+              )}
+              recomendações
             </button>
           )}
           {activeProjectId && (

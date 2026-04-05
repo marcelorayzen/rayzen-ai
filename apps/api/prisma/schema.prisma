@@ -25,6 +25,7 @@ model Project {
   sessionArtifacts     SessionArtifact[]
   projectDocuments     ProjectDocument[]
   projectState         ProjectState?
+  recommendations      ProjectRecommendation[]
 
   @@map("projects")
 }
@@ -89,6 +90,23 @@ model Event {
 
   @@index([projectId, ts(sort: Desc)])
   @@map("events")
+}
+
+model ProjectRecommendation {
+  id          String    @id @default(uuid())
+  projectId   String    @map("project_id")
+  type        String    // inactivity | doc_stale | blocker_stuck | next_step_pending | consistency
+  title       String
+  description String
+  priority    String    @default("medium") // low | medium | high
+  action      String?   // texto da ação sugerida
+  dismissedAt DateTime? @map("dismissed_at")
+  computedAt  DateTime  @default(now()) @map("computed_at")
+
+  project Project @relation(fields: [projectId], references: [id])
+
+  @@index([projectId, dismissedAt])
+  @@map("project_recommendations")
 }
 
 model ProjectState {

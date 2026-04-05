@@ -21,6 +21,7 @@ import { DocumentationModule } from './modules/documentation/documentation.modul
 import { ObsidianModule } from './modules/obsidian/obsidian.module'
 import { ProjectStateModule } from './modules/project-state/project-state.module'
 import { GitModule } from './modules/git/git.module'
+import { ProactiveModule } from './modules/proactive/proactive.module'
 
 @Module({
   imports: [
@@ -45,6 +46,7 @@ import { GitModule } from './modules/git/git.module'
     ObsidianModule,
     ProjectStateModule,
     GitModule,
+    ProactiveModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
