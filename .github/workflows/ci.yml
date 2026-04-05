@@ -24,9 +24,14 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+        env:
+          PUPPETEER_SKIP_DOWNLOAD: 'true'
+
+      - name: Generate Prisma client
+        run: pnpm --filter api db:generate
 
       - name: Type check
-        run: pnpm typecheck
+        run: pnpm --filter api typecheck && pnpm --filter agent typecheck
 
   test:
     name: Tests & Coverage
@@ -45,6 +50,11 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+        env:
+          PUPPETEER_SKIP_DOWNLOAD: 'true'
+
+      - name: Generate Prisma client
+        run: pnpm --filter api db:generate
 
       - name: Run tests with coverage
         run: pnpm --filter api test:cov
