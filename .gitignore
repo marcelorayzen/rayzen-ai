@@ -39,3 +39,9 @@ tmp/
 *.tmp
 *.tsbuildinfo
 .cache/
+
+# Hook config local (contém token — nunca commitar)
+apps/agent/src/hooks/hook.config.mjs
+
+# Coverage
+apps/api/coverage/
