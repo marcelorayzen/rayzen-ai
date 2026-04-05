@@ -76,7 +76,7 @@ export default function Home() {
   }, [router])
 
   useEffect(() => {
-    fetch(`${API_URL}/stats/tokens`, { headers: authHeaders() })
+    fetch(`${API_URL}/sessions/tokens`, { headers: authHeaders() })
       .then((r) => r.json())
       .then((d) => setDailyTokens(d.last24h?.tokens ?? 0))
       .catch(() => null)
@@ -92,7 +92,7 @@ export default function Home() {
 
   const loadSessions = useCallback(async () => {
     try {
-      const res = await fetch(`${API_URL}/stats/sessions`, { headers: authHeaders() })
+      const res = await fetch(`${API_URL}/sessions`, { headers: authHeaders() })
       const data = await res.json()
       setSessions(Array.isArray(data) ? data : [])
     } catch {
@@ -109,7 +109,7 @@ export default function Home() {
     if (loadingSession) return
     setLoadingSession(sid)
     try {
-      const res = await fetch(`${API_URL}/stats/sessions/${sid}/messages`, { headers: authHeaders() })
+      const res = await fetch(`${API_URL}/sessions/${sid}/messages`, { headers: authHeaders() })
       const data = await res.json() as Array<{ role: string; content: string; module: string | null }>
       const loaded: Message[] = data.map((m) => ({
         role: m.role as 'user' | 'assistant',
@@ -132,7 +132,7 @@ export default function Home() {
     if (deletingSession) return
     setDeletingSession(sid)
     try {
-      await fetch(`${API_URL}/stats/sessions/${sid}`, { method: 'DELETE', headers: authHeaders() })
+      await fetch(`${API_URL}/sessions/${sid}`, { method: 'DELETE', headers: authHeaders() })
       setSessions((prev) => prev.filter((s) => s.sessionId !== sid))
       if (sid === sessionId) {
         setMessages([])
@@ -160,7 +160,7 @@ export default function Home() {
     try {
       // Remove URL caso o usuário cole o link completo
       const username = githubUser.trim().replace(/^https?:\/\/github\.com\//, '').replace(/\/$/, '')
-      const res = await fetch(`${API_URL}/brain/index/github`, {
+      const res = await fetch(`${API_URL}/memory/index/github`, {
         method: 'POST',
         headers: authHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ username, token: githubToken.trim() || undefined }),
@@ -183,7 +183,7 @@ export default function Home() {
     setImportLoading(true)
     setImportResult(null)
     try {
-      const res = await fetch(`${API_URL}/brain/index/url`, {
+      const res = await fetch(`${API_URL}/memory/index/url`, {
         method: 'POST',
         headers: authHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ url: importUrl.trim() }),
@@ -206,7 +206,7 @@ export default function Home() {
     try {
       const formData = new FormData()
       formData.append('file', file)
-      const res = await fetch(`${API_URL}/brain/index/file`, {
+      const res = await fetch(`${API_URL}/memory/index/file`, {
         method: 'POST',
         headers: authHeaders(),
         body: formData,

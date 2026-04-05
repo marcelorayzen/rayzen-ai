@@ -351,7 +351,7 @@ Seja direto, claro e amigável. Português brasileiro. Sem JSON bruto.`,
       try {
         const result = await this.documentProcessing.generatePDF(prompt, sessionId)
         return {
-          reply: `Documento gerado com sucesso: **${result.fileName}** (${Math.round(result.sizeBytes / 1024)}KB). Acesse via POST /doc/pdf para baixar.`,
+          reply: `Documento gerado com sucesso: **${result.fileName}** (${Math.round(result.sizeBytes / 1024)}KB). Acesse via POST /documents/pdf para baixar.`,
           module: classify.module,
           action: classify.action,
           confidence: classify.confidence,
