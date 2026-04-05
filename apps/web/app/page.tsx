@@ -86,6 +86,15 @@ interface ProjectState {
 
 type QuickCaptureIntent = 'decision' | 'idea' | 'problem' | 'reference'
 
+interface DocVersion {
+  id: string
+  content: string
+  diff: string | null
+  reason: string
+  sourceIds: string[]
+  createdAt: string
+}
+
 type ImportTab = 'github' | 'file' | 'url'
 
 export default function Home() {
@@ -119,6 +128,10 @@ export default function Home() {
   const [activeDocType, setActiveDocType] = useState<string>('project_state')
   const [syncing, setSyncing] = useState(false)
   const [syncResult, setSyncResult] = useState<{ synced: number; conflicts: Array<{type: string; vaultModifiedAt: string}> } | null>(null)
+  const [versionsOpen, setVersionsOpen] = useState(false)
+  const [versions, setVersions] = useState<DocVersion[]>([])
+  const [versionsLoading, setVersionsLoading] = useState(false)
+  const [expandedVersion, setExpandedVersion] = useState<string | null>(null)
   const [projectState, setProjectState] = useState<ProjectState | null>(null)
   const [stateOpen, setStateOpen] = useState(false)
   const [stateRefreshing, setStateRefreshing] = useState(false)
@@ -323,6 +336,19 @@ export default function Home() {
       setSyncResult({ synced: data.synced?.length ?? 0, conflicts: data.conflicts ?? [] })
     } catch { /* silencioso */ }
     finally { setSyncing(false) }
+  }, [activeProjectId])
+
+  const openVersions = useCallback(async (type: string) => {
+    if (!activeProjectId) return
+    setVersionsOpen(true)
+    setVersionsLoading(true)
+    setVersions([])
+    setExpandedVersion(null)
+    try {
+      const res = await fetch(`${API_URL}/documentation/${activeProjectId}/${type}/versions`, { headers: authHeaders() })
+      if (res.ok) setVersions(await res.json() as DocVersion[])
+    } catch { /* silencioso */ }
+    finally { setVersionsLoading(false) }
   }, [activeProjectId])
 
   const loadProjectState = useCallback(async (projectId: string) => {
@@ -668,6 +694,62 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col">
 
+      {/* Document versions modal */}
+      {versionsOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center">
+          <div className="fixed inset-0 bg-black/80" onClick={() => setVersionsOpen(false)} />
+          <div className="relative z-[60] w-full max-w-2xl bg-zinc-900 border border-zinc-800 rounded-2xl mx-4 max-h-[85vh] flex flex-col">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-800">
+              <h2 className="text-sm font-semibold">Histórico de versões</h2>
+              <button onClick={() => setVersionsOpen(false)} className="text-zinc-500 hover:text-zinc-300 text-xs">fechar</button>
+            </div>
+            <div className="overflow-y-auto flex-1 px-6 py-4 space-y-3">
+              {versionsLoading && <p className="text-zinc-500 text-xs text-center py-8">Carregando…</p>}
+              {!versionsLoading && versions.length === 0 && (
+                <p className="text-zinc-500 text-xs text-center py-8">Nenhuma versão anterior. O histórico começa na próxima regeneração.</p>
+              )}
+              {versions.map((v) => (
+                <div key={v.id} className="border border-zinc-800 rounded-xl overflow-hidden">
+                  <button
+                    onClick={() => setExpandedVersion(expandedVersion === v.id ? null : v.id)}
+                    className="w-full flex items-center justify-between px-4 py-3 hover:bg-zinc-800 transition-colors text-left"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs text-zinc-300">{new Date(v.createdAt).toLocaleString('pt-BR')}</span>
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
+                        v.reason === 'force_regenerated' ? 'bg-red-900 text-red-300' : 'bg-zinc-700 text-zinc-400'
+                      }`}>{v.reason}</span>
+                      <span className="text-[10px] text-zinc-600">{v.sourceIds?.length ?? 0} fontes</span>
+                    </div>
+                    <span className="text-zinc-600 text-xs">{expandedVersion === v.id ? '▲' : '▼'}</span>
+                  </button>
+                  {expandedVersion === v.id && (
+                    <div className="border-t border-zinc-800">
+                      {v.diff && (
+                        <div className="px-4 py-3 border-b border-zinc-800">
+                          <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wide mb-2">Diff em relação à versão seguinte</p>
+                          <pre className="text-[11px] font-mono whitespace-pre-wrap leading-relaxed">
+                            {v.diff.split('\n').map((line, i) => (
+                              <span key={i} className={`block ${line.startsWith('+') ? 'text-emerald-400' : line.startsWith('-') ? 'text-red-400' : 'text-zinc-500'}`}>
+                                {line}
+                              </span>
+                            ))}
+                          </pre>
+                        </div>
+                      )}
+                      <div className="px-4 py-3 max-h-64 overflow-y-auto">
+                        <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wide mb-2">Conteúdo desta versão</p>
+                        <pre className="text-[11px] text-zinc-400 whitespace-pre-wrap font-mono leading-relaxed">{v.content}</pre>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Project State modal */}
       {stateOpen && projectState && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -923,6 +1005,12 @@ export default function Home() {
                             Gerado em {new Date(activeDoc.generatedAt).toLocaleString('pt-BR')}
                             {activeDoc.reviewedAt && ` · revisado ${new Date(activeDoc.reviewedAt).toLocaleString('pt-BR')}`}
                           </span>
+                          <button
+                            onClick={() => openVersions(activeDocType)}
+                            className="text-[10px] text-zinc-500 hover:text-zinc-300 transition-colors underline"
+                          >
+                            ver histórico
+                          </button>
                         </div>
                         <div className="prose prose-invert prose-sm max-w-none">
                           <ReactMarkdown>{activeDoc.content}</ReactMarkdown>

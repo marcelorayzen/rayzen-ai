@@ -1,7 +1,8 @@
-import { Controller, Get, Post, Body, Query } from '@nestjs/common'
+import { Controller, Get, Post, Body, Query, Param } from '@nestjs/common'
 import { ApiTags, ApiOperation } from '@nestjs/swagger'
 import { EventService, CreateEventDto } from './event.service'
 import { SynthesisService } from '../synthesis/synthesis.service'
+import { PrismaClient } from '@prisma/client'
 
 // Payload enviado pelo hook do Claude Code via stdin
 interface CliHookPayload {
@@ -17,6 +18,8 @@ interface CliHookPayload {
 @ApiTags('events')
 @Controller('events')
 export class EventController {
+  private prisma = new PrismaClient()
+
   constructor(
     private readonly events: EventService,
     private readonly synthesis: SynthesisService,
@@ -89,6 +92,26 @@ export class EventController {
       content,
       metadata: { tool, input, sessionId: payload.session_id },
     })
+  }
+
+  @Get(':id/why')
+  @ApiOperation({ summary: 'Trilha de causalidade: quais sínteses e versões de doc usaram este evento' })
+  async why(@Param('id') id: string) {
+    const [syntheses, docVersions] = await Promise.all([
+      this.prisma.sessionArtifact.findMany({
+        where: { sourceIds: { array_contains: id } },
+        orderBy: { createdAt: 'desc' },
+        select: { id: true, type: true, sessionId: true, projectId: true, createdAt: true,
+          content: true },
+      }),
+      this.prisma.projectDocumentVersion.findMany({
+        where: { sourceIds: { array_contains: id } },
+        orderBy: { createdAt: 'desc' },
+        select: { id: true, reason: true, diff: true, createdAt: true,
+          document: { select: { type: true, projectId: true } } },
+      }),
+    ])
+    return { eventId: id, syntheses, docVersions }
   }
 
   @Get()

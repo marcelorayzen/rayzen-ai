@@ -40,6 +40,7 @@ export class SynthesisService {
     }
 
     const synthesis = await this.runSynthesis({ messages, events, label: 'sessão' })
+    const sourceIds = events.map(e => e.id)
 
     const artifact = await this.prisma.sessionArtifact.create({
       data: {
@@ -47,6 +48,7 @@ export class SynthesisService {
         projectId: projectId ?? null,
         type: 'synthesis',
         content: synthesis as object,
+        sourceIds: sourceIds as object,
       },
     })
 
@@ -80,6 +82,7 @@ export class SynthesisService {
     }
 
     const synthesis = await this.runSynthesis({ messages, events, label: 'checkpoint', note })
+    const sourceIds = events.map(e => e.id)
 
     const checkpointId = `checkpoint-${Date.now()}`
     const artifact = await this.prisma.sessionArtifact.create({
@@ -88,6 +91,7 @@ export class SynthesisService {
         projectId,
         type: 'checkpoint',
         content: synthesis as object,
+        sourceIds: sourceIds as object,
       },
     })
 

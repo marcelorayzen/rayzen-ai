@@ -37,18 +37,36 @@ model ProjectDocument {
   generatedAt DateTime  @default(now()) @map("generated_at")
   reviewedAt  DateTime? @map("reviewed_at")
 
-  project Project @relation(fields: [projectId], references: [id])
+  project  Project                  @relation(fields: [projectId], references: [id])
+  versions ProjectDocumentVersion[]
 
   @@unique([projectId, type])
   @@map("project_documents")
+}
+
+model ProjectDocumentVersion {
+  id              String   @id @default(uuid())
+  documentId      String   @map("document_id")
+  content         String   // conteúdo desta versão
+  previousContent String?  @map("previous_content") // conteúdo anterior (null na primeira versão)
+  diff            String?  // diff resumido: linhas adicionadas/removidas
+  reason          String   @default("regenerated") // regenerated | force_regenerated | manual
+  sourceIds       Json     @default("[]") @map("source_ids") // IDs de events + artifacts usados
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  document ProjectDocument @relation(fields: [documentId], references: [id])
+
+  @@index([documentId, createdAt(sort: Desc)])
+  @@map("project_document_versions")
 }
 
 model SessionArtifact {
   id        String   @id @default(uuid())
   projectId String?  @map("project_id")
   sessionId String   @map("session_id")
-  type      String   @default("synthesis") // synthesis | summary
-  content   Json     // { summary, decisions[], next_steps[], learnings[] }
+  type      String   @default("synthesis") // synthesis | checkpoint
+  content   Json     // { summary, decisions[], next_steps[], learnings[], confidence }
+  sourceIds Json     @default("[]") @map("source_ids") // IDs dos eventos usados para gerar
   createdAt DateTime @default(now()) @map("created_at")
 
   project Project? @relation(fields: [projectId], references: [id])

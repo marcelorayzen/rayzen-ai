@@ -44,6 +44,18 @@ ${ctx}
 Formato: entradas cronológicas com cabeçalho de data/sessão. Tom técnico e direto. Máximo 600 palavras.`,
 }
 
+// Diff simples linha a linha: retorna linhas adicionadas (+) e removidas (-)
+function computeDiff(oldText: string, newText: string): string {
+  const oldLines = new Set(oldText.split('\n').map(l => l.trim()).filter(Boolean))
+  const newLines = new Set(newText.split('\n').map(l => l.trim()).filter(Boolean))
+
+  const removed = [...oldLines].filter(l => !newLines.has(l)).map(l => `- ${l}`)
+  const added   = [...newLines].filter(l => !oldLines.has(l)).map(l => `+ ${l}`)
+
+  if (removed.length === 0 && added.length === 0) return '(sem alterações significativas)'
+  return [...removed, ...added].slice(0, 60).join('\n')
+}
+
 @Injectable()
 export class DocumentationService {
   private prisma = new PrismaClient()
@@ -56,11 +68,26 @@ export class DocumentationService {
     })
   }
 
-  async generate(projectId: string, type: DocType): Promise<{ id: string; type: string; content: string; generatedAt: string }> {
+  async generate(
+    projectId: string,
+    type: DocType,
+    opts: { force?: boolean } = {},
+  ): Promise<{ id: string; type: string; content: string; generatedAt: string }> {
     const project = await this.prisma.project.findUnique({ where: { id: projectId } })
     if (!project) throw new NotFoundException('Projeto não encontrado')
 
-    // Buscar sínteses + eventos recentes para contexto
+    // Verificar proteção de revisão manual
+    const existing = await this.prisma.projectDocument.findUnique({
+      where: { projectId_type: { projectId, type } },
+    })
+
+    if (existing?.reviewedAt && !opts.force) {
+      throw new BadRequestException(
+        'Este documento foi revisado manualmente. Use force=true para regenerar.',
+      )
+    }
+
+    // Coletar contexto com IDs rastreáveis
     const [artifacts, events] = await Promise.all([
       this.prisma.sessionArtifact.findMany({
         where: { projectId },
@@ -73,6 +100,11 @@ export class DocumentationService {
         take: 40,
       }),
     ])
+
+    const sourceIds = [
+      ...artifacts.map(a => a.id),
+      ...events.map(e => e.id),
+    ]
 
     // Montar contexto
     const synthLines = artifacts.map(a => {
@@ -87,8 +119,8 @@ export class DocumentationService {
     }).join('\n\n')
 
     const eventLines = events
-      .filter(e => e.type !== 'message') // filtra ruído de mensagens individuais
-      .map(e => `- [${new Date(e.ts).toLocaleDateString('pt-BR')}] [${e.source}/${e.type}] ${e.content}`)
+      .filter(e => e.type !== 'message')
+      .map(e => `- [${new Date(e.ts).toLocaleDateString('pt-BR')}] [${e.intent ?? e.source}/${e.type}] ${e.content}`)
       .join('\n')
 
     const context = [
@@ -107,31 +139,35 @@ export class DocumentationService {
       messages: [{ role: 'user', content: promptFn(context) }],
     })
 
-    const content = res.choices[0].message.content ?? ''
+    const newContent = res.choices[0].message.content ?? ''
 
-    // Upsert — nunca sobrescreve versão revisada
-    const existing = await this.prisma.projectDocument.findUnique({
-      where: { projectId_type: { projectId, type } },
-    })
-
-    if (existing?.reviewedAt) {
-      throw new BadRequestException(
-        'Este documento foi revisado manualmente. Use force=true para regenerar.',
-      )
+    // Salvar versão anterior antes de sobrescrever
+    if (existing) {
+      const diff = computeDiff(existing.content, newContent)
+      await this.prisma.projectDocumentVersion.create({
+        data: {
+          documentId: existing.id,
+          content: existing.content,
+          previousContent: null, // esta versão era a "anterior"
+          diff,
+          reason: opts.force ? 'force_regenerated' : 'regenerated',
+          sourceIds: sourceIds as object,
+        },
+      })
     }
 
     const doc = await this.prisma.projectDocument.upsert({
       where: { projectId_type: { projectId, type } },
-      create: { projectId, type, content },
-      update: { content, generatedAt: new Date() },
+      create: { projectId, type, content: newContent },
+      update: { content: newContent, generatedAt: new Date(), reviewedAt: null },
     })
 
     return { id: doc.id, type: doc.type, content: doc.content, generatedAt: doc.generatedAt.toISOString() }
   }
 
-  async generateAll(projectId: string) {
+  async generateAll(projectId: string, opts: { force?: boolean } = {}) {
     const types: DocType[] = ['project_state', 'decisions_log', 'next_actions', 'work_journal']
-    const results = await Promise.allSettled(types.map(t => this.generate(projectId, t)))
+    const results = await Promise.allSettled(types.map(t => this.generate(projectId, t, opts)))
     return types.map((type, i) => {
       const r = results[i]
       return r.status === 'fulfilled'
@@ -145,6 +181,27 @@ export class DocumentationService {
       where: { projectId },
       orderBy: { generatedAt: 'desc' },
       select: { id: true, type: true, content: true, generatedAt: true, reviewedAt: true },
+    })
+  }
+
+  async getVersions(projectId: string, type: DocType) {
+    const doc = await this.prisma.projectDocument.findUnique({
+      where: { projectId_type: { projectId, type } },
+    })
+    if (!doc) return []
+
+    return this.prisma.projectDocumentVersion.findMany({
+      where: { documentId: doc.id },
+      orderBy: { createdAt: 'desc' },
+      take: 20,
+      select: {
+        id: true,
+        content: true,
+        diff: true,
+        reason: true,
+        sourceIds: true,
+        createdAt: true,
+      },
     })
   }
 
