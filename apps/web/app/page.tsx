@@ -41,6 +41,15 @@ interface Project {
   status: string
 }
 
+interface ActivityEvent {
+  id: string
+  source: string
+  type: string
+  content: string
+  metadata: Record<string, unknown>
+  ts: string
+}
+
 type ImportTab = 'github' | 'file' | 'url'
 
 export default function Home() {
@@ -60,6 +69,9 @@ export default function Home() {
   const router = useRouter()
   const [projects, setProjects] = useState<Project[]>([])
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null)
+  const [activityOpen, setActivityOpen] = useState(false)
+  const [activityEvents, setActivityEvents] = useState<ActivityEvent[]>([])
+  const [activityLoading, setActivityLoading] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
   const [importTab, setImportTab] = useState<ImportTab>('github')
   const [importLoading, setImportLoading] = useState(false)
@@ -167,6 +179,23 @@ export default function Home() {
     setSessionTokens(0)
     setSidebarOpen(false)
   }, [])
+
+  const openActivity = useCallback(async () => {
+    setActivityOpen(true)
+    setActivityLoading(true)
+    try {
+      const url = activeProjectId
+        ? `${API_URL}/events?project_id=${activeProjectId}&limit=40`
+        : `${API_URL}/events?limit=40`
+      const res = await fetch(url, { headers: authHeaders() })
+      const data = await res.json() as ActivityEvent[]
+      setActivityEvents(data)
+    } catch {
+      setActivityEvents([])
+    } finally {
+      setActivityLoading(false)
+    }
+  }, [activeProjectId])
 
   const handleImportGithub = useCallback(async () => {
     if (!githubUser.trim()) return
@@ -433,6 +462,44 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col">
+      {/* Activity modal */}
+      {activityOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="fixed inset-0 bg-black/70" onClick={() => setActivityOpen(false)} />
+          <div className="relative z-50 w-full max-w-lg bg-zinc-900 border border-zinc-800 rounded-2xl p-6 mx-4 max-h-[80vh] flex flex-col">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-sm font-semibold">
+                Atividade{activeProjectId && projects.find(p => p.id === activeProjectId) ? ` — ${projects.find(p => p.id === activeProjectId)!.name}` : ''}
+              </h2>
+              <button onClick={() => setActivityOpen(false)} className="text-zinc-500 hover:text-zinc-300 text-xs">fechar</button>
+            </div>
+            <div className="overflow-y-auto flex-1 space-y-2">
+              {activityLoading && <p className="text-zinc-500 text-xs text-center py-4">Carregando…</p>}
+              {!activityLoading && activityEvents.length === 0 && (
+                <p className="text-zinc-500 text-xs text-center py-4">Nenhum evento registrado ainda.</p>
+              )}
+              {activityEvents.map((ev) => (
+                <div key={ev.id} className="flex gap-3 py-2 border-b border-zinc-800 last:border-0">
+                  <div className="flex flex-col items-center gap-1 min-w-[56px]">
+                    <span className="text-[10px] text-zinc-500 font-mono">{ev.source}</span>
+                    <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-medium ${
+                      ev.type === 'message' ? 'bg-indigo-900 text-indigo-300' :
+                      ev.type === 'index'   ? 'bg-emerald-900 text-emerald-300' :
+                      ev.type === 'execution' ? 'bg-amber-900 text-amber-300' :
+                      'bg-zinc-800 text-zinc-400'
+                    }`}>{ev.type}</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-zinc-300 truncate">{ev.content}</p>
+                    <p className="text-[10px] text-zinc-600 mt-0.5">{new Date(ev.ts).toLocaleString('pt-BR')}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Import modal */}
       {importOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -656,6 +723,13 @@ export default function Home() {
               ))}
             </select>
           )}
+          <button
+            onClick={openActivity}
+            className="text-zinc-500 hover:text-zinc-300 transition-colors text-xs"
+            title="Atividade"
+          >
+            atividade
+          </button>
           <button
             onClick={() => {
               document.cookie = 'rayzen_token=; path=/; max-age=0'
