@@ -13,6 +13,12 @@ export class SynthesisController {
     return this.svc.synthesizeSession(body.sessionId, body.projectId)
   }
 
+  @Post('checkpoint')
+  @ApiOperation({ summary: 'Checkpoint manual: sintetiza atividade desde o último checkpoint ou últimas 2h' })
+  checkpoint(@Body() body: { projectId: string; note?: string }) {
+    return this.svc.checkpoint(body.projectId, body.note)
+  }
+
   @Get('artifacts')
   @ApiOperation({ summary: 'Listar artefatos de síntese por projeto ou sessão' })
   list(@Query('project_id') projectId?: string, @Query('session_id') sessionId?: string) {

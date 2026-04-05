@@ -61,14 +61,30 @@ interface ProjectDoc {
 interface SynthesisArtifact {
   id: string
   sessionId: string
+  type?: string
   createdAt: string
   content: {
     summary: string
     decisions: string[]
     next_steps: string[]
     learnings: string[]
+    confidence?: 'low' | 'medium' | 'high'
   }
 }
+
+interface ProjectState {
+  objective: string
+  stage: string
+  blockers: string[]
+  recentDecisions: string[]
+  nextSteps: string[]
+  risks: string[]
+  docGaps: string[]
+  riskLevel: 'low' | 'medium' | 'high'
+  updatedAt: string
+}
+
+type QuickCaptureIntent = 'decision' | 'idea' | 'problem' | 'reference'
 
 type ImportTab = 'github' | 'file' | 'url'
 
@@ -103,6 +119,14 @@ export default function Home() {
   const [activeDocType, setActiveDocType] = useState<string>('project_state')
   const [syncing, setSyncing] = useState(false)
   const [syncResult, setSyncResult] = useState<{ synced: number; conflicts: Array<{type: string; vaultModifiedAt: string}> } | null>(null)
+  const [projectState, setProjectState] = useState<ProjectState | null>(null)
+  const [stateOpen, setStateOpen] = useState(false)
+  const [stateRefreshing, setStateRefreshing] = useState(false)
+  const [checkpointing, setCheckpointing] = useState(false)
+  const [quickCaptureOpen, setQuickCaptureOpen] = useState(false)
+  const [quickCaptureIntent, setQuickCaptureIntent] = useState<QuickCaptureIntent>('idea')
+  const [quickCaptureText, setQuickCaptureText] = useState('')
+  const [quickCaptureSaving, setQuickCaptureSaving] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
   const [importTab, setImportTab] = useState<ImportTab>('github')
   const [importLoading, setImportLoading] = useState(false)
@@ -139,6 +163,14 @@ export default function Home() {
       .then((d) => setProjects(d as Project[]))
       .catch(() => null)
   }, [])
+
+  useEffect(() => {
+    if (activeProjectId) {
+      loadProjectState(activeProjectId)
+    } else {
+      setProjectState(null)
+    }
+  }, [activeProjectId, loadProjectState])
 
   useEffect(() => {
     setSessionId(crypto.randomUUID())
@@ -292,6 +324,65 @@ export default function Home() {
     } catch { /* silencioso */ }
     finally { setSyncing(false) }
   }, [activeProjectId])
+
+  const loadProjectState = useCallback(async (projectId: string) => {
+    try {
+      const res = await fetch(`${API_URL}/projects/${projectId}/state`, { headers: authHeaders() })
+      if (res.ok) setProjectState(await res.json() as ProjectState)
+    } catch { /* silencioso */ }
+  }, [])
+
+  const refreshProjectState = useCallback(async () => {
+    if (!activeProjectId) return
+    setStateRefreshing(true)
+    try {
+      const res = await fetch(`${API_URL}/projects/${activeProjectId}/state/refresh`, {
+        method: 'POST',
+        headers: authHeaders(),
+      })
+      if (res.ok) setProjectState(await res.json() as ProjectState)
+    } catch { /* silencioso */ }
+    finally { setStateRefreshing(false) }
+  }, [activeProjectId])
+
+  const doCheckpoint = useCallback(async () => {
+    if (!activeProjectId) return
+    setCheckpointing(true)
+    try {
+      const res = await fetch(`${API_URL}/synthesis/checkpoint`, {
+        method: 'POST',
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ projectId: activeProjectId }),
+      })
+      if (res.ok) {
+        const artifact = await res.json() as SynthesisArtifact
+        setSynthesisArtifacts(prev => [artifact, ...prev])
+        setSynthesisOpen(true)
+      }
+    } catch { /* silencioso */ }
+    finally { setCheckpointing(false) }
+  }, [activeProjectId])
+
+  const submitQuickCapture = useCallback(async () => {
+    if (!quickCaptureText.trim() || !activeProjectId) return
+    setQuickCaptureSaving(true)
+    try {
+      await fetch(`${API_URL}/events`, {
+        method: 'POST',
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({
+          projectId: activeProjectId,
+          source: 'manual',
+          type: quickCaptureIntent === 'decision' ? 'decision' : 'note',
+          intent: quickCaptureIntent,
+          content: quickCaptureText.trim(),
+        }),
+      })
+      setQuickCaptureText('')
+      setQuickCaptureOpen(false)
+    } catch { /* silencioso */ }
+    finally { setQuickCaptureSaving(false) }
+  }, [quickCaptureText, quickCaptureIntent, activeProjectId])
 
   const handleImportGithub = useCallback(async () => {
     if (!githubUser.trim()) return
@@ -556,8 +647,149 @@ export default function Home() {
     return `${days}d`
   }
 
+  const RISK_COLORS: Record<string, string> = {
+    low: 'bg-emerald-500',
+    medium: 'bg-amber-500',
+    high: 'bg-red-500',
+  }
+
+  const STAGE_LABELS: Record<string, string> = {
+    discovery: 'Descoberta', building: 'Em construção', stabilizing: 'Estabilizando',
+    maintaining: 'Manutenção', paused: 'Pausado',
+  }
+
+  const INTENT_CONFIG: Record<QuickCaptureIntent, { label: string; color: string }> = {
+    decision: { label: 'Decisão', color: 'bg-indigo-600 text-white' },
+    idea:     { label: 'Ideia',   color: 'bg-emerald-600 text-white' },
+    problem:  { label: 'Problema', color: 'bg-red-600 text-white' },
+    reference: { label: 'Referência', color: 'bg-zinc-600 text-white' },
+  }
+
   return (
     <main className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col">
+
+      {/* Project State modal */}
+      {stateOpen && projectState && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="fixed inset-0 bg-black/70" onClick={() => setStateOpen(false)} />
+          <div className="relative z-50 w-full max-w-lg bg-zinc-900 border border-zinc-800 rounded-2xl mx-4 max-h-[85vh] flex flex-col">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-800">
+              <div className="flex items-center gap-2">
+                <div className={`w-2.5 h-2.5 rounded-full ${RISK_COLORS[projectState.riskLevel]}`} />
+                <h2 className="text-sm font-semibold">Estado do projeto</h2>
+                <span className="text-xs text-zinc-500">{STAGE_LABELS[projectState.stage] ?? projectState.stage}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={refreshProjectState}
+                  disabled={stateRefreshing}
+                  className="text-xs bg-zinc-700 hover:bg-zinc-600 disabled:opacity-40 text-zinc-200 px-3 py-1.5 rounded-lg transition-colors"
+                >
+                  {stateRefreshing ? 'Atualizando…' : 'Atualizar'}
+                </button>
+                <button onClick={() => setStateOpen(false)} className="text-zinc-500 hover:text-zinc-300 text-xs">fechar</button>
+              </div>
+            </div>
+            <div className="overflow-y-auto flex-1 px-6 py-4 space-y-4">
+              {projectState.objective && (
+                <div>
+                  <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wide mb-1">Objetivo atual</p>
+                  <p className="text-sm text-zinc-200">{projectState.objective}</p>
+                </div>
+              )}
+              {projectState.blockers.length > 0 && (
+                <div>
+                  <p className="text-[10px] font-semibold text-red-400 uppercase tracking-wide mb-1">Bloqueios</p>
+                  <ul className="space-y-1">{projectState.blockers.map((b, i) => (
+                    <li key={i} className="text-xs text-zinc-300 flex gap-1"><span className="text-red-500">■</span>{b}</li>
+                  ))}</ul>
+                </div>
+              )}
+              {projectState.nextSteps.length > 0 && (
+                <div>
+                  <p className="text-[10px] font-semibold text-amber-400 uppercase tracking-wide mb-1">Próximos passos</p>
+                  <ul className="space-y-1">{projectState.nextSteps.map((s, i) => (
+                    <li key={i} className="text-xs text-zinc-300 flex gap-1"><span className="text-amber-500">→</span>{s}</li>
+                  ))}</ul>
+                </div>
+              )}
+              {projectState.recentDecisions.length > 0 && (
+                <div>
+                  <p className="text-[10px] font-semibold text-indigo-400 uppercase tracking-wide mb-1">Decisões recentes</p>
+                  <ul className="space-y-1">{projectState.recentDecisions.map((d, i) => (
+                    <li key={i} className="text-xs text-zinc-300">· {d}</li>
+                  ))}</ul>
+                </div>
+              )}
+              {projectState.risks.length > 0 && (
+                <div>
+                  <p className="text-[10px] font-semibold text-orange-400 uppercase tracking-wide mb-1">Riscos</p>
+                  <ul className="space-y-1">{projectState.risks.map((r, i) => (
+                    <li key={i} className="text-xs text-zinc-400">· {r}</li>
+                  ))}</ul>
+                </div>
+              )}
+              {projectState.docGaps.length > 0 && (
+                <div>
+                  <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wide mb-1">Lacunas de documentação</p>
+                  <ul className="space-y-1">{projectState.docGaps.map((g, i) => (
+                    <li key={i} className="text-xs text-zinc-500">· {g}</li>
+                  ))}</ul>
+                </div>
+              )}
+              <p className="text-[10px] text-zinc-700">Atualizado em {new Date(projectState.updatedAt).toLocaleString('pt-BR')}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Quick capture modal */}
+      {quickCaptureOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="fixed inset-0 bg-black/70" onClick={() => { setQuickCaptureOpen(false); setQuickCaptureText('') }} />
+          <div className="relative z-50 w-full max-w-md bg-zinc-900 border border-zinc-800 rounded-2xl p-5 mx-4">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-sm font-semibold">Captura rápida</h2>
+              <button onClick={() => { setQuickCaptureOpen(false); setQuickCaptureText('') }} className="text-zinc-500 hover:text-zinc-300 text-xl leading-none">×</button>
+            </div>
+            <div className="flex gap-1.5 mb-4">
+              {(Object.keys(INTENT_CONFIG) as QuickCaptureIntent[]).map(intent => (
+                <button
+                  key={intent}
+                  onClick={() => setQuickCaptureIntent(intent)}
+                  className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                    quickCaptureIntent === intent ? INTENT_CONFIG[intent].color : 'bg-zinc-800 text-zinc-500 hover:text-zinc-300'
+                  }`}
+                >
+                  {INTENT_CONFIG[intent].label}
+                </button>
+              ))}
+            </div>
+            <textarea
+              value={quickCaptureText}
+              onChange={(e) => setQuickCaptureText(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) submitQuickCapture() }}
+              placeholder={
+                quickCaptureIntent === 'decision' ? 'O que foi decidido?' :
+                quickCaptureIntent === 'idea' ? 'Qual é a ideia?' :
+                quickCaptureIntent === 'problem' ? 'Qual é o problema encontrado?' :
+                'URL ou referência a guardar'
+              }
+              rows={4}
+              autoFocus
+              className="w-full bg-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-100 placeholder:text-zinc-600 outline-none focus:ring-1 focus:ring-zinc-600 resize-none mb-3"
+            />
+            <button
+              onClick={submitQuickCapture}
+              disabled={quickCaptureSaving || !quickCaptureText.trim()}
+              className="w-full bg-zinc-100 text-zinc-900 rounded-lg py-2 text-sm font-medium disabled:opacity-40 hover:bg-white transition-colors"
+            >
+              {quickCaptureSaving ? 'Salvando…' : 'Registrar (⌘ + Enter)'}
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Activity modal */}
       {activityOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -731,7 +963,19 @@ export default function Home() {
               {synthesisArtifacts.map((a) => (
                 <div key={a.id} className="border border-zinc-800 rounded-xl p-4 space-y-3">
                   <div className="flex items-center justify-between">
-                    <span className="text-[10px] text-zinc-500 font-mono">{new Date(a.createdAt).toLocaleString('pt-BR')}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] text-zinc-500 font-mono">{new Date(a.createdAt).toLocaleString('pt-BR')}</span>
+                      {a.type === 'checkpoint' && (
+                        <span className="text-[9px] bg-amber-900 text-amber-300 px-1.5 py-0.5 rounded-full font-medium">checkpoint</span>
+                      )}
+                      {a.content.confidence && (
+                        <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-medium ${
+                          a.content.confidence === 'high' ? 'bg-emerald-900 text-emerald-300' :
+                          a.content.confidence === 'medium' ? 'bg-zinc-700 text-zinc-300' :
+                          'bg-zinc-800 text-zinc-500'
+                        }`}>{a.content.confidence}</span>
+                      )}
+                    </div>
                     <span className="text-[10px] text-zinc-600 font-mono truncate ml-2">{a.sessionId.slice(0, 8)}…</span>
                   </div>
                   <p className="text-xs text-zinc-300">{a.content.summary}</p>
@@ -982,6 +1226,35 @@ export default function Home() {
                 <option key={p.id} value={p.id}>{p.name}</option>
               ))}
             </select>
+          )}
+          {activeProjectId && projectState && (
+            <button
+              onClick={() => setStateOpen(true)}
+              className="flex items-center gap-1.5 text-xs text-zinc-400 hover:text-zinc-200 transition-colors"
+              title="Ver estado do projeto"
+            >
+              <div className={`w-2 h-2 rounded-full ${RISK_COLORS[projectState.riskLevel]}`} />
+              {STAGE_LABELS[projectState.stage] ?? projectState.stage}
+            </button>
+          )}
+          {activeProjectId && (
+            <button
+              onClick={() => setQuickCaptureOpen(true)}
+              className="text-zinc-500 hover:text-zinc-300 transition-colors text-xs"
+              title="Captura rápida: decisão, ideia, problema"
+            >
+              + capturar
+            </button>
+          )}
+          {activeProjectId && (
+            <button
+              onClick={doCheckpoint}
+              disabled={checkpointing}
+              className="text-zinc-500 hover:text-zinc-300 disabled:opacity-40 transition-colors text-xs"
+              title="Checkpoint: sintetiza atividade recente"
+            >
+              {checkpointing ? '…' : 'checkpoint'}
+            </button>
           )}
           <button
             onClick={openActivity}

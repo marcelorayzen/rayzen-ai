@@ -24,6 +24,7 @@ model Project {
   events               Event[]
   sessionArtifacts     SessionArtifact[]
   projectDocuments     ProjectDocument[]
+  projectState         ProjectState?
 
   @@map("projects")
 }
@@ -61,6 +62,7 @@ model Event {
   projectId String?  @map("project_id")
   source    String   // chat | memory | cli | voice | execution | manual
   type      String   // message | index | execution | decision | note | error
+  intent    String?  // decision | idea | problem | reference | checkpoint
   content   String
   metadata  Json     @default("{}")
   ts        DateTime @default(now())
@@ -69,6 +71,24 @@ model Event {
 
   @@index([projectId, ts(sort: Desc)])
   @@map("events")
+}
+
+model ProjectState {
+  id              String   @id @default(uuid())
+  projectId       String   @unique @map("project_id")
+  objective       String?
+  stage           String?  // discovery | building | stabilizing | maintaining | paused
+  blockers        Json     @default("[]")
+  recentDecisions Json     @default("[]") @map("recent_decisions")
+  nextSteps       Json     @default("[]") @map("next_steps")
+  risks           Json     @default("[]")
+  docGaps         Json     @default("[]") @map("doc_gaps")
+  riskLevel       String   @default("low") @map("risk_level") // low | medium | high
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  project Project @relation(fields: [projectId], references: [id])
+
+  @@map("project_states")
 }
 
 model Document {

@@ -3,11 +3,13 @@ import { PrismaClient } from '@prisma/client'
 
 export type EventSource = 'chat' | 'memory' | 'cli' | 'voice' | 'execution' | 'manual'
 export type EventType = 'message' | 'index' | 'execution' | 'decision' | 'note' | 'error'
+export type EventIntent = 'decision' | 'idea' | 'problem' | 'reference' | 'checkpoint'
 
 export interface CreateEventDto {
   projectId?: string
   source: EventSource
   type: EventType
+  intent?: EventIntent
   content: string
   metadata?: Record<string, unknown>
 }
@@ -22,6 +24,7 @@ export class EventService {
         projectId: dto.projectId ?? null,
         source: dto.source,
         type: dto.type,
+        intent: dto.intent ?? null,
         content: dto.content,
         metadata: (dto.metadata ?? {}) as object,
       },
