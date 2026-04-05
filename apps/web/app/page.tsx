@@ -50,6 +50,14 @@ interface ActivityEvent {
   ts: string
 }
 
+interface ProjectDoc {
+  id: string
+  type: string
+  content: string
+  generatedAt: string
+  reviewedAt: string | null
+}
+
 interface SynthesisArtifact {
   id: string
   sessionId: string
@@ -88,6 +96,11 @@ export default function Home() {
   const [synthesisArtifacts, setSynthesisArtifacts] = useState<SynthesisArtifact[]>([])
   const [synthesisLoading, setSynthesisLoading] = useState(false)
   const [synthesizing, setSynthesizing] = useState(false)
+  const [docsOpen, setDocsOpen] = useState(false)
+  const [projectDocs, setProjectDocs] = useState<ProjectDoc[]>([])
+  const [docsLoading, setDocsLoading] = useState(false)
+  const [generatingDocs, setGeneratingDocs] = useState(false)
+  const [activeDocType, setActiveDocType] = useState<string>('project_state')
   const [importOpen, setImportOpen] = useState(false)
   const [importTab, setImportTab] = useState<ImportTab>('github')
   const [importLoading, setImportLoading] = useState(false)
@@ -237,6 +250,31 @@ export default function Home() {
     } catch { /* silencioso */ }
     finally { setSynthesizing(false) }
   }, [sessionId, activeProjectId])
+
+  const openDocs = useCallback(async () => {
+    if (!activeProjectId) return
+    setDocsOpen(true)
+    setDocsLoading(true)
+    try {
+      const res = await fetch(`${API_URL}/documentation/${activeProjectId}`, { headers: authHeaders() })
+      setProjectDocs(await res.json() as ProjectDoc[])
+    } catch { setProjectDocs([]) }
+    finally { setDocsLoading(false) }
+  }, [activeProjectId])
+
+  const generateAllDocs = useCallback(async () => {
+    if (!activeProjectId) return
+    setGeneratingDocs(true)
+    try {
+      await fetch(`${API_URL}/documentation/generate/${activeProjectId}`, {
+        method: 'POST',
+        headers: authHeaders(),
+      })
+      const res = await fetch(`${API_URL}/documentation/${activeProjectId}`, { headers: authHeaders() })
+      setProjectDocs(await res.json() as ProjectDoc[])
+    } catch { /* silencioso */ }
+    finally { setGeneratingDocs(false) }
+  }, [activeProjectId])
 
   const handleImportGithub = useCallback(async () => {
     if (!githubUser.trim()) return
@@ -541,6 +579,85 @@ export default function Home() {
         </div>
       )}
 
+      {/* Documentation modal */}
+      {docsOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="fixed inset-0 bg-black/70" onClick={() => setDocsOpen(false)} />
+          <div className="relative z-50 w-full max-w-3xl bg-zinc-900 border border-zinc-800 rounded-2xl mx-4 max-h-[90vh] flex flex-col">
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-800">
+              <h2 className="text-sm font-semibold">Documentação viva</h2>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={generateAllDocs}
+                  disabled={generatingDocs}
+                  className="text-xs bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white px-3 py-1.5 rounded-lg transition-colors"
+                >
+                  {generatingDocs ? 'Gerando…' : 'Regenerar tudo'}
+                </button>
+                <button onClick={() => setDocsOpen(false)} className="text-zinc-500 hover:text-zinc-300 text-xs">fechar</button>
+              </div>
+            </div>
+            {/* Tabs */}
+            {(() => {
+              const DOC_TABS = [
+                { type: 'project_state', label: 'Estado do projeto' },
+                { type: 'decisions_log', label: 'Decisões' },
+                { type: 'next_actions', label: 'Próximas ações' },
+                { type: 'work_journal', label: 'Diário' },
+              ]
+              const activeDoc = projectDocs.find(d => d.type === activeDocType)
+              return (
+                <>
+                  <div className="flex gap-1 px-6 pt-4 pb-0">
+                    {DOC_TABS.map(tab => (
+                      <button
+                        key={tab.type}
+                        onClick={() => setActiveDocType(tab.type)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${activeDocType === tab.type ? 'bg-zinc-700 text-zinc-100' : 'text-zinc-500 hover:text-zinc-300'}`}
+                      >
+                        {tab.label}
+                        {projectDocs.find(d => d.type === tab.type)?.reviewedAt && (
+                          <span className="ml-1 text-emerald-500">✓</span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex-1 overflow-y-auto px-6 py-4">
+                    {docsLoading && <p className="text-zinc-500 text-xs text-center py-8">Carregando…</p>}
+                    {!docsLoading && !activeDoc && (
+                      <div className="text-center py-8">
+                        <p className="text-zinc-500 text-xs mb-3">Documento não gerado ainda.</p>
+                        <button
+                          onClick={generateAllDocs}
+                          disabled={generatingDocs}
+                          className="text-xs bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-4 py-2 rounded-lg transition-colors disabled:opacity-40"
+                        >
+                          {generatingDocs ? 'Gerando…' : 'Gerar agora'}
+                        </button>
+                      </div>
+                    )}
+                    {!docsLoading && activeDoc && (
+                      <div>
+                        <div className="flex items-center justify-between mb-3">
+                          <span className="text-[10px] text-zinc-600">
+                            Gerado em {new Date(activeDoc.generatedAt).toLocaleString('pt-BR')}
+                            {activeDoc.reviewedAt && ` · revisado ${new Date(activeDoc.reviewedAt).toLocaleString('pt-BR')}`}
+                          </span>
+                        </div>
+                        <div className="prose prose-invert prose-sm max-w-none">
+                          <ReactMarkdown>{activeDoc.content}</ReactMarkdown>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </>
+              )
+            })()}
+          </div>
+        </div>
+      )}
+
       {/* Synthesis modal */}
       {synthesisOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -831,6 +948,14 @@ export default function Home() {
           >
             síntese
           </button>
+          {activeProjectId && (
+            <button
+              onClick={openDocs}
+              className="text-zinc-500 hover:text-zinc-300 transition-colors text-xs"
+            >
+              docs
+            </button>
+          )}
           <button
             onClick={() => {
               document.cookie = 'rayzen_token=; path=/; max-age=0'

@@ -23,8 +23,23 @@ model Project {
   conversationMessages ConversationMessage[]
   events               Event[]
   sessionArtifacts     SessionArtifact[]
+  projectDocuments     ProjectDocument[]
 
   @@map("projects")
+}
+
+model ProjectDocument {
+  id          String    @id @default(uuid())
+  projectId   String    @map("project_id")
+  type        String    // project_state | decisions_log | next_actions | work_journal
+  content     String    // markdown gerado
+  generatedAt DateTime  @default(now()) @map("generated_at")
+  reviewedAt  DateTime? @map("reviewed_at")
+
+  project Project @relation(fields: [projectId], references: [id])
+
+  @@unique([projectId, type])
+  @@map("project_documents")
 }
 
 model SessionArtifact {

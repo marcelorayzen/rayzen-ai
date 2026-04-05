@@ -17,6 +17,7 @@ import { ValidationModule } from './modules/validation/validation.module'
 import { ProjectModule } from './modules/project/project.module'
 import { EventModule } from './modules/event/event.module'
 import { SynthesisModule } from './modules/synthesis/synthesis.module'
+import { DocumentationModule } from './modules/documentation/documentation.module'
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import { SynthesisModule } from './modules/synthesis/synthesis.module'
     ProjectModule,
     EventModule,
     SynthesisModule,
+    DocumentationModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
