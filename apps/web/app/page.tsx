@@ -236,20 +236,6 @@ export default function Home() {
   }, [])
 
   useEffect(() => {
-    if (activeProjectId) {
-      loadProjectState(activeProjectId)
-      loadGitContext(activeProjectId)
-      loadRecommendations(activeProjectId)
-      loadHealth(activeProjectId)
-    } else {
-      setProjectState(null)
-      setGitContext(null)
-      setRecommendations([])
-      setHealthData(null)
-    }
-  }, [activeProjectId, loadProjectState, loadGitContext, loadRecommendations, loadHealth])
-
-  useEffect(() => {
     setSessionId(crypto.randomUUID())
   }, [])
 
@@ -450,6 +436,20 @@ export default function Home() {
       if (res.ok) setHealthData(await res.json() as HealthData)
     } catch { /* silencioso */ }
   }, [])
+
+  useEffect(() => {
+    if (activeProjectId) {
+      loadProjectState(activeProjectId)
+      loadGitContext(activeProjectId)
+      loadRecommendations(activeProjectId)
+      loadHealth(activeProjectId)
+    } else {
+      setProjectState(null)
+      setGitContext(null)
+      setRecommendations([])
+      setHealthData(null)
+    }
+  }, [activeProjectId, loadProjectState, loadGitContext, loadRecommendations, loadHealth])
 
   const openRecommendations = useCallback(async () => {
     if (!activeProjectId) return
