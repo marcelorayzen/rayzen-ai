@@ -110,17 +110,22 @@ model ProjectRecommendation {
 }
 
 model ProjectState {
-  id              String   @id @default(uuid())
-  projectId       String   @unique @map("project_id")
-  objective       String?
-  stage           String?  // discovery | building | stabilizing | maintaining | paused
-  blockers        Json     @default("[]")
-  recentDecisions Json     @default("[]") @map("recent_decisions")
-  nextSteps       Json     @default("[]") @map("next_steps")
-  risks           Json     @default("[]")
-  docGaps         Json     @default("[]") @map("doc_gaps")
-  riskLevel       String   @default("low") @map("risk_level") // low | medium | high
-  updatedAt       DateTime @updatedAt @map("updated_at")
+  id               String   @id @default(uuid())
+  projectId        String   @unique @map("project_id")
+  objective        String?
+  stage            String?  // discovery | building | stabilizing | maintaining | paused
+  blockers         Json     @default("[]")
+  recentDecisions  Json     @default("[]") @map("recent_decisions")
+  nextSteps        Json     @default("[]") @map("next_steps")
+  risks            Json     @default("[]")
+  docGaps          Json     @default("[]") @map("doc_gaps")
+  riskLevel        String   @default("low") @map("risk_level") // low | medium | high
+  // Fase 11 — Planejamento operacional
+  milestones       Json     @default("[]")   // { id, title, status: pending|active|done }[]
+  backlog          Json     @default("[]")   // { id, title, priority: high|medium|low }[]
+  activeFocus      String?  @map("active_focus")
+  definitionOfDone String?  @map("definition_of_done")
+  updatedAt        DateTime @updatedAt @map("updated_at")
 
   project Project @relation(fields: [projectId], references: [id])
 

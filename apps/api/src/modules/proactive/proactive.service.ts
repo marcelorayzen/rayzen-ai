@@ -139,6 +139,8 @@ export class ProactiveService {
     }
 
     // ── Regra 3: Bloqueio persistente em 3+ sessões ──────────────────────────
+    let stuckBlockerTitle: string | null = null
+
     if (artifacts.length >= 3) {
       const recentThree = artifacts.slice(0, 3)
       const blockerCounts: Record<string, number> = {}
@@ -155,6 +157,7 @@ export class ProactiveService {
 
       const stuck = Object.entries(blockerCounts).filter(([, c]) => c >= 3)
       if (stuck.length > 0) {
+        stuckBlockerTitle = stuck[0][0]
         newRecs.push({
           projectId,
           type: 'blocker_stuck',
@@ -164,6 +167,14 @@ export class ProactiveService {
           action: 'Revise se esses itens estão realmente bloqueados ou precisam ser redefinidos.',
         })
       }
+    }
+
+    // ── Heurística Fase 11: blocker em 3+ refreshes → promover para activeFocus ─
+    if (stuckBlockerTitle && state && !state.activeFocus) {
+      await this.prisma.projectState.update({
+        where: { projectId },
+        data: { activeFocus: stuckBlockerTitle.slice(0, 200) },
+      })
     }
 
     // ── Regra 4: Next steps sem evento correspondente após 7 dias ────────────

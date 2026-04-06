@@ -1,6 +1,6 @@
-import { Controller, Get, Post, Param } from '@nestjs/common'
+import { Controller, Get, Post, Patch, Param, Body } from '@nestjs/common'
 import { ApiTags, ApiOperation } from '@nestjs/swagger'
-import { ProjectStateService } from './project-state.service'
+import { ProjectStateService, Milestone, BacklogItem } from './project-state.service'
 
 @ApiTags('project-state')
 @Controller('projects')
@@ -17,5 +17,25 @@ export class ProjectStateController {
   @ApiOperation({ summary: 'Regenerar estado do projeto com base nos eventos e sínteses recentes' })
   refresh(@Param('id') id: string) {
     return this.svc.refresh(id)
+  }
+
+  @Post(':id/resume')
+  @ApiOperation({ summary: 'Brief de retomada: onde parei, o que mudou, blockers ativos, próximo melhor passo' })
+  resume(@Param('id') id: string) {
+    return this.svc.resume(id)
+  }
+
+  @Patch(':id/state/planning')
+  @ApiOperation({ summary: 'Atualizar campos de planejamento: milestones, backlog, activeFocus, definitionOfDone' })
+  updatePlanning(
+    @Param('id') id: string,
+    @Body() body: {
+      milestones?: Milestone[]
+      backlog?: BacklogItem[]
+      activeFocus?: string
+      definitionOfDone?: string
+    },
+  ) {
+    return this.svc.updatePlanning(id, body)
   }
 }
