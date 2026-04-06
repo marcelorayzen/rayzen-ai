@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config'
 import { PrismaClient } from '@prisma/client'
 import OpenAI from 'openai'
 import { HealthScoreService } from '../health/health.service'
+import { EventService } from '../event/event.service'
 
 export interface Milestone {
   id: string
@@ -39,6 +40,7 @@ export class ProjectStateService {
   constructor(
     private config: ConfigService,
     private healthScore: HealthScoreService,
+    private eventService: EventService,
   ) {
     this.llm = new OpenAI({
       baseURL: this.config.get('LITELLM_BASE_URL', 'http://localhost:4000/v1'),
@@ -202,8 +204,9 @@ Regras:
       },
     })
 
-    // Compute health score in background after state refresh (non-blocking)
+    // Background: compute health score + promote stale events (Fase 12 & 13)
     this.healthScore.compute(projectId).catch(() => null)
+    this.eventService.promoteStaleEvents(projectId).catch(() => null)
 
     return this.serialize(state)
   }

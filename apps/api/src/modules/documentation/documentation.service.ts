@@ -95,8 +95,16 @@ export class DocumentationService {
         take: 10,
       }),
       this.prisma.event.findMany({
-        where: { projectId },
-        orderBy: { ts: 'desc' },
+        where: {
+          projectId,
+          // Fase 13: priorizar consolidated + working; ignorar archive
+          memoryClass: { in: ['consolidated', 'working', 'inbox'] },
+        },
+        orderBy: [
+          // consolidated first, then working, then inbox
+          { memoryClass: 'asc' },
+          { ts: 'desc' },
+        ],
         take: 40,
       }),
     ])

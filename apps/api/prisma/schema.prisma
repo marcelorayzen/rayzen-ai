@@ -78,18 +78,20 @@ model SessionArtifact {
 }
 
 model Event {
-  id        String   @id @default(uuid())
-  projectId String?  @map("project_id")
-  source    String   // chat | memory | cli | voice | execution | manual
-  type      String   // message | index | execution | decision | note | error
-  intent    String?  // decision | idea | problem | reference | checkpoint
-  content   String
-  metadata  Json     @default("{}")
-  ts        DateTime @default(now())
+  id          String   @id @default(uuid())
+  projectId   String?  @map("project_id")
+  source      String   // chat | memory | cli | voice | execution | manual
+  type        String   // message | index | execution | decision | note | error
+  intent      String?  // decision | idea | problem | reference | checkpoint
+  content     String
+  metadata    Json     @default("{}")
+  ts          DateTime @default(now())
+  memoryClass String   @default("inbox") @map("memory_class") // inbox | working | consolidated | archive
 
   project Project? @relation(fields: [projectId], references: [id])
 
   @@index([projectId, ts(sort: Desc)])
+  @@index([projectId, memoryClass])
   @@map("events")
 }
 

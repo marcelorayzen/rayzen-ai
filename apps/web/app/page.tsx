@@ -48,6 +48,7 @@ interface ActivityEvent {
   content: string
   metadata: Record<string, unknown>
   ts: string
+  memoryClass?: string
 }
 
 interface ProjectDoc {
@@ -120,6 +121,7 @@ interface GitContext {
 }
 
 type QuickCaptureIntent = 'decision' | 'idea' | 'problem' | 'reference'
+type MemoryClassFilter = 'all' | 'inbox' | 'working' | 'consolidated' | 'archive'
 
 interface Recommendation {
   id: string
@@ -162,6 +164,7 @@ export default function Home() {
   const [activityOpen, setActivityOpen] = useState(false)
   const [activityEvents, setActivityEvents] = useState<ActivityEvent[]>([])
   const [activityLoading, setActivityLoading] = useState(false)
+  const [memoryClassFilter, setMemoryClassFilter] = useState<MemoryClassFilter>('all')
   const [synthesisOpen, setSynthesisOpen] = useState(false)
   const [synthesisArtifacts, setSynthesisArtifacts] = useState<SynthesisArtifact[]>([])
   const [synthesisLoading, setSynthesisLoading] = useState(false)
@@ -315,14 +318,13 @@ export default function Home() {
     setSidebarOpen(false)
   }, [])
 
-  const openActivity = useCallback(async () => {
-    setActivityOpen(true)
+  const loadActivityEvents = useCallback(async (memClass: MemoryClassFilter) => {
     setActivityLoading(true)
     try {
-      const url = activeProjectId
-        ? `${API_URL}/events?project_id=${activeProjectId}&limit=40`
-        : `${API_URL}/events?limit=40`
-      const res = await fetch(url, { headers: authHeaders() })
+      const params = new URLSearchParams({ limit: '40' })
+      if (activeProjectId) params.set('project_id', activeProjectId)
+      if (memClass !== 'all') params.set('memory_class', memClass)
+      const res = await fetch(`${API_URL}/events?${params}`, { headers: authHeaders() })
       const data = await res.json() as ActivityEvent[]
       setActivityEvents(data)
     } catch {
@@ -331,6 +333,12 @@ export default function Home() {
       setActivityLoading(false)
     }
   }, [activeProjectId])
+
+  const openActivity = useCallback(async () => {
+    setActivityOpen(true)
+    setMemoryClassFilter('all')
+    loadActivityEvents('all')
+  }, [loadActivityEvents])
 
   const openSynthesis = useCallback(async () => {
     setSynthesisOpen(true)
@@ -1242,12 +1250,33 @@ export default function Home() {
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div className="fixed inset-0 bg-black/70" onClick={() => setActivityOpen(false)} />
           <div className="relative z-50 w-full max-w-lg bg-zinc-900 border border-zinc-800 rounded-2xl p-6 mx-4 max-h-[80vh] flex flex-col">
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between mb-3">
               <h2 className="text-sm font-semibold">
                 Atividade{activeProjectId && projects.find(p => p.id === activeProjectId) ? ` — ${projects.find(p => p.id === activeProjectId)!.name}` : ''}
               </h2>
               <button onClick={() => setActivityOpen(false)} className="text-zinc-500 hover:text-zinc-300 text-xs">fechar</button>
             </div>
+            {activeProjectId && (
+              <div className="flex gap-1 mb-3 flex-wrap">
+                {(['all', 'consolidated', 'working', 'inbox', 'archive'] as MemoryClassFilter[]).map((cls) => (
+                  <button
+                    key={cls}
+                    onClick={() => { setMemoryClassFilter(cls); loadActivityEvents(cls) }}
+                    className={`text-[10px] px-2 py-1 rounded-lg font-medium transition-colors ${
+                      memoryClassFilter === cls
+                        ? cls === 'consolidated' ? 'bg-emerald-700 text-white'
+                          : cls === 'working'      ? 'bg-amber-700 text-white'
+                          : cls === 'archive'      ? 'bg-zinc-600 text-zinc-300'
+                          : cls === 'inbox'        ? 'bg-indigo-700 text-white'
+                          : 'bg-zinc-700 text-zinc-200'
+                        : 'bg-zinc-800 text-zinc-500 hover:text-zinc-300'
+                    }`}
+                  >
+                    {cls}
+                  </button>
+                ))}
+              </div>
+            )}
             <div className="overflow-y-auto flex-1 space-y-2">
               {activityLoading && <p className="text-zinc-500 text-xs text-center py-4">Carregando…</p>}
               {!activityLoading && activityEvents.length === 0 && (
@@ -1271,6 +1300,14 @@ export default function Home() {
                       <p className="text-xs text-zinc-300 truncate">{ev.content}</p>
                       <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                         <span className="text-[10px] text-zinc-600">{new Date(ev.ts).toLocaleString('pt-BR')}</span>
+                        {ev.memoryClass && ev.memoryClass !== 'inbox' && (
+                          <span className={`text-[9px] px-1.5 py-0.5 rounded font-medium ${
+                            ev.memoryClass === 'consolidated' ? 'bg-emerald-900 text-emerald-300' :
+                            ev.memoryClass === 'working'      ? 'bg-amber-900 text-amber-300' :
+                            ev.memoryClass === 'archive'      ? 'bg-zinc-700 text-zinc-500' :
+                            'bg-zinc-800 text-zinc-500'
+                          }`}>{ev.memoryClass}</span>
+                        )}
                         {git?.['branch'] && (
                           <span className="text-[10px] font-mono text-indigo-400">⎇ {String(git['branch'])}</span>
                         )}

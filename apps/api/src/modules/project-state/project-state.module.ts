@@ -1,10 +1,11 @@
-import { Module } from '@nestjs/common'
+import { Module, forwardRef } from '@nestjs/common'
 import { ProjectStateController } from './project-state.controller'
 import { ProjectStateService } from './project-state.service'
 import { HealthModule } from '../health/health.module'
+import { EventModule } from '../event/event.module'
 
 @Module({
-  imports: [HealthModule],
+  imports: [HealthModule, forwardRef(() => EventModule)],
   controllers: [ProjectStateController],
   providers: [ProjectStateService],
   exports: [ProjectStateService],

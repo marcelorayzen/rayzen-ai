@@ -69,7 +69,12 @@ export class SynthesisService {
 
     const [events, messages] = await Promise.all([
       this.prisma.event.findMany({
-        where: { projectId, ts: { gte: since } },
+        where: {
+          projectId,
+          ts: { gte: since },
+          // Fase 13: ignorar eventos arquivados no contexto de síntese
+          memoryClass: { not: 'archive' },
+        },
         orderBy: { ts: 'asc' },
         select: { id: true, source: true, type: true, intent: true, content: true, metadata: true },
       }),

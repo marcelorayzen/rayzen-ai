@@ -1,6 +1,6 @@
-import { Controller, Get, Post, Body, Query, Param } from '@nestjs/common'
+import { Controller, Get, Post, Patch, Body, Query, Param } from '@nestjs/common'
 import { ApiTags, ApiOperation } from '@nestjs/swagger'
-import { EventService, CreateEventDto } from './event.service'
+import { EventService, CreateEventDto, MemoryClass } from './event.service'
 import { SynthesisService } from '../synthesis/synthesis.service'
 import { PrismaClient } from '@prisma/client'
 
@@ -105,6 +105,12 @@ export class EventController {
     })
   }
 
+  @Patch(':id/class')
+  @ApiOperation({ summary: 'Promover ou rebaixar evento manualmente: inbox | working | consolidated | archive' })
+  updateClass(@Param('id') id: string, @Body() body: { memoryClass: MemoryClass }) {
+    return this.events.updateClass(id, body.memoryClass)
+  }
+
   @Get(':id/why')
   @ApiOperation({ summary: 'Trilha de causalidade: quais sínteses e versões de doc usaram este evento' })
   async why(@Param('id') id: string) {
@@ -131,8 +137,9 @@ export class EventController {
     @Query('project_id') projectId?: string,
     @Query('source') source?: string,
     @Query('type') type?: string,
+    @Query('memory_class') memoryClass?: string,
     @Query('limit') limit?: string,
   ) {
-    return this.events.findAll({ projectId, source, type, limit: limit ? parseInt(limit) : undefined })
+    return this.events.findAll({ projectId, source, type, memoryClass, limit: limit ? parseInt(limit) : undefined })
   }
 }
