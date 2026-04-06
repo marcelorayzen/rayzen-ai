@@ -10,54 +10,114 @@
 
 <h1>Rayzen AI</h1>
 
-<p><strong>Personal AI platform combining semantic memory, PC automation, document generation,<br />Notion sync, and voice — built as a production-grade NestJS monorepo.</strong></p>
+<p><strong>Plataforma pessoal de IA com memória semântica, automação do PC, geração de documentos,<br />integração com Notion e voz — construída como um monorepo NestJS de nível production.</strong></p>
 
 <p>
-  <a href="#architecture">Architecture</a> ·
-  <a href="#what-does-it-solve">What it solves</a> ·
-  <a href="#technical-differentials">Differentials</a> ·
-  <a href="#module-reference">Modules</a> ·
-  <a href="#pc-agent-actions">PC Agent</a> ·
+  <a href="README.en.md">🇺🇸 English</a> &nbsp;|&nbsp;
+  <a href="#demo">Demo</a> ·
+  <a href="#o-que-resolve">O que resolve</a> ·
+  <a href="#arquitetura">Arquitetura</a> ·
+  <a href="#diferenciais-técnicos">Diferenciais</a> ·
+  <a href="#referência-de-módulos">Módulos</a> ·
+  <a href="#ações-do-pc-agent">PC Agent</a> ·
   <a href="#quick-start">Quick start</a> ·
-  <a href="#documentation">Docs</a>
+  <a href="#documentação">Docs</a>
 </p>
 
 </div>
 
 ---
 
-## What does it solve?
+## Demo
 
-| Scenario | Module | How |
-|---|---|---|
-| "What did I read about Docker last week?" | Memory | pgvector similarity search over indexed documents + conversations |
-| "Open VS Code and run git status" | Execution | BullMQ task dispatched to local PC Agent over Redis |
-| "Generate a PDF contract for this client" | Document Processing | Two-step confirmation → Puppeteer renders HTML → PDF download link in chat |
-| "Write a LinkedIn post about this article" | Content Engine | LLM (temp=0.8) with tone/format prompt, returns formatted text |
-| "Generate an architecture diagram" | Content Engine | Mermaid diagram auto-typed (flowchart/sequence/erDiagram) + rendered in UI |
-| "Read that message back to me" | Voice | Groq PlayAI TTS, markdown-stripped, streamed audio |
-| "How healthy is this project?" | Health Score | 6-dimension weighted score (0–100) with 30-day history chart |
-| "Where did I stop? What changed?" | Resume Brief | `POST /projects/:id/resume` — structured catch-up in seconds |
-| "Save this to my Notion" | Notion | Creates/appends pages via Notion SDK, markdown → Notion blocks |
-| "Show me the schema of the database" | Execution → Agent | `inspect_schema` parses `schema.prisma` locally, returns model catalogue |
-| "Run the tests and show me coverage" | Execution → Agent | `run_tests` invokes Jest/Vitest/Playwright, returns structured results |
+<div align="center">
+
+<!-- 
+  DEMO — como adicionar:
+  1. Grave um vídeo de 30–60s mostrando o chat, uma tarefa do agent e geração de PDF.
+  2. Arraste o arquivo MP4 para um comentário de qualquer issue do GitHub.
+  3. GitHub vai fazer upload e gerar um link CDN (ex: https://github.com/user/repo/assets/...).
+  4. Cole o link abaixo substituindo o placeholder.
+-->
+
+> **Demo em breve** — gravação em andamento.
+
+<!--
+<video src="COLE_AQUI_O_LINK_CDN_DO_GITHUB" controls width="700">
+  Seu navegador não suporta o elemento de vídeo.
+</video>
+-->
+
+</div>
 
 ---
 
-## Architecture
+## Screenshots
+
+<div align="center">
+
+<!--
+  SCREENSHOTS — como adicionar:
+  Salve as capturas em docs/assets/ com os nomes abaixo e remova os comentários.
+
+  <table>
+    <tr>
+      <td><img src="docs/assets/chat.png" alt="Chat" width="360" /></td>
+      <td><img src="docs/assets/agent.png" alt="PC Agent" width="360" /></td>
+    </tr>
+    <tr>
+      <td align="center"><sub>Chat com streaming SSE e roteamento por módulo</sub></td>
+      <td align="center"><sub>PC Agent executando tarefas locais</sub></td>
+    </tr>
+    <tr>
+      <td><img src="docs/assets/settings.png" alt="Configurações" width="360" /></td>
+      <td><img src="docs/assets/health.png" alt="Health Score" width="360" /></td>
+    </tr>
+    <tr>
+      <td align="center"><sub>Painel de configurações e work modes</sub></td>
+      <td align="center"><sub>Health score do projeto — 6 dimensões</sub></td>
+    </tr>
+  </table>
+-->
+
+> **Screenshots em breve** — serão adicionados após o deploy na VPS.
+
+</div>
+
+---
+
+## O que resolve?
+
+| Cenário | Módulo | Como |
+|---|---|---|
+| "O que li sobre Docker semana passada?" | Memory | Busca por similaridade pgvector sobre documentos + conversas indexadas |
+| "Abre o VS Code e roda o git status" | Execution | Task BullMQ despachada para o PC Agent local via Redis |
+| "Gera um PDF de contrato para este cliente" | Document Processing | Confirmação em 2 etapas → Puppeteer renderiza HTML → link de download no chat |
+| "Escreve um post no LinkedIn sobre este artigo" | Content Engine | LLM (temp=0.8) com prompt de tom/formato, retorna texto formatado |
+| "Gera um diagrama da arquitetura" | Content Engine | Diagrama Mermaid com tipo inferido automaticamente + renderizado no frontend |
+| "Lê essa mensagem em voz alta" | Voice | Groq PlayAI TTS, markdown removido, áudio transmitido |
+| "Qual a saúde deste projeto?" | Health Score | Score ponderado em 6 dimensões (0–100) com histórico de 30 dias |
+| "Onde parei? O que mudou?" | Resume Brief | `POST /projects/:id/resume` — resumo estruturado em segundos |
+| "Salva isso no meu Notion" | Notion | Cria/acrescenta páginas via SDK Notion, markdown → blocos Notion |
+| "Mostra o schema do banco de dados" | Execution → Agent | `inspect_schema` parseia `schema.prisma` localmente, retorna catálogo de modelos |
+| "Roda os testes e mostra coverage" | Execution → Agent | `run_tests` invoca Jest/Vitest/Playwright, retorna resultado estruturado |
+
+---
+
+## Arquitetura
 
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
 │                    Browser  (Next.js 15 App Router)                  │
-│  ReactMarkdown + custom <a> renders PDF links + Mermaid blocks       │
+│  ReactMarkdown + <a> customizado renderiza links PDF + blocos Mermaid│
 └────────────────────────────┬─────────────────────────────────────────┘
                              │ HTTP / SSE stream
 ┌────────────────────────────▼─────────────────────────────────────────┐
 │                      OrchestratorModule                               │
-│  ① ValidationService.assertValidPrompt()  — prompt injection guard   │
+│  ① ValidationService.assertValidPrompt()  — proteção contra injeção  │
 │  ② classify() → { module, action, confidence }  gpt-4o-mini temp=0  │
-│  ③ isPendingDocConfirmation() — two-step doc flow                    │
-│  ④ handleMessage() → route to module → stream reply via SSE          │
+│  ③ isPendingDocConfirmation() — fluxo de doc em 2 etapas            │
+│  ④ handleMessage() → roteia para módulo → transmite resposta via SSE │
 └──┬──────────┬──────────┬────────────┬────────────┬───────────────────┘
    │          │          │            │            │
 Memory    Execution  Document    Content       Voice
@@ -66,9 +126,9 @@ pgvector  BullMQ     Puppeteer   LiteLLM       Groq TTS/STT
 Jina      Redis      docxtempl.  Mermaid       Whisper
    │          │
    │    ┌─────┴──────────────────────────┐
-   │    │     PC Agent  (local Node.js)  │
-   │    │  poll every 3s via BullMQ      │
-   │    │  26 whitelist-guarded actions  │
+   │    │     PC Agent  (Node.js local)  │
+   │    │  poll a cada 3s via BullMQ     │
+   │    │  26 ações protegidas whitelist │
    │    └────────────────────────────────┘
    │
    └──── Notion ── Project ── Health ── Proactive ── Event ── Git
@@ -76,258 +136,257 @@ Jina      Redis      docxtempl.  Mermaid       Whisper
 
 **Data stores:**
 
-| Store | Role |
+| Store | Papel |
 |---|---|
-| PostgreSQL 16 + pgvector 0.7 | Documents, conversations, embeddings (1024-dim), health scores, events |
-| Redis 7 + BullMQ 5 | Task queue between API and PC Agent |
-| LiteLLM (Docker sidecar) | Multi-provider LLM proxy — OpenAI, Groq, Anthropic, all via one endpoint |
+| PostgreSQL 16 + pgvector 0.7 | Documentos, conversas, embeddings (1024-dim), health scores, eventos |
+| Redis 7 + BullMQ 5 | Fila de tasks entre API e PC Agent |
+| LiteLLM (Docker sidecar) | Proxy LLM multi-provider — OpenAI, Groq, Anthropic, tudo via um endpoint |
 
-See [docs/architecture.md](docs/architecture.md) for the full module catalogue and data flows.
+Veja [docs/architecture.md](docs/architecture.md) para o catálogo completo de módulos e fluxos de dados.
 
 ---
 
-## Technical differentials
+## Diferenciais técnicos
 
-- **LiteLLM proxy** — provider-agnostic LLM layer; swap OpenAI ↔ Groq ↔ Anthropic via config, zero code changes; per-`virtual_key` budget enforcement
+- **Proxy LiteLLM** — camada LLM agnóstica de provider; troque OpenAI ↔ Groq ↔ Anthropic via config, zero alterações de código; controle de budget por `virtual_key`
 
-- **Whitelist-enforced PC Agent** — 26 actions explicitly allow-listed in `whitelist.ts`; any unknown action silently rejected; path traversal blocked at `list_dir` and `file_search`; medium/high-risk actions run `dryRun: true` before the real operation
+- **PC Agent com whitelist** — 26 ações explicitamente permitidas em `whitelist.ts`; qualquer ação desconhecida é rejeitada silenciosamente; path traversal bloqueado; ações de risco médio/alto executam `dryRun: true` antes da operação real
 
-- **Validation layer** — `ValidationModule` sits at the entry point of every request: detects prompt injection patterns, enforces prompt length, checks output for system-prompt leakage, and validates that classified modules are in the known set
+- **Camada de validação** — `ValidationModule` na entrada de cada requisição: detecta padrões de prompt injection, aplica limite de tamanho, verifica vazamento de system prompt na saída, valida que módulos classificados existem
 
-- **pgvector semantic memory** — Jina jina-embeddings-v3 (1024-dim) stored in PostgreSQL; full conversation history is also indexed for continuous learning across sessions
+- **Memória semântica pgvector** — Jina jina-embeddings-v3 (1024-dim) armazenado no PostgreSQL; todo o histórico de conversa é indexado para aprendizado contínuo entre sessões
 
-- **Streaming SSE** — chat responses stream token-by-token with typewriter effect; `tokens_used` and `duration_ms` logged on every LLM call and persisted to `ConversationMessage`
+- **Streaming SSE** — respostas transmitidas token a token com efeito typewriter; `tokens_used` e `duration_ms` logados em cada chamada LLM e persistidos em `ConversationMessage`
 
-- **Two-step document confirmation** — doc requests show a preview with size/page estimate before generating; original prompt embedded as `[DOC_PENDING:base64]` in assistant message, confirmation triggers generation and returns a clickable download link
+- **Confirmação de documento em 2 etapas** — pedidos de doc mostram preview com estimativa antes de gerar; prompt original embutido como `[DOC_PENDING:base64]`, confirmação dispara geração e retorna link de download clicável
 
-- **Global `PrismaService`** — single `@Global()` NestJS module, one database connection pool shared across all 20+ modules; eliminates the `new PrismaClient()` anti-pattern
+- **`PrismaService` global** — único módulo `@Global()` NestJS, um pool de conexão compartilhado entre todos os 20+ módulos; elimina o anti-pattern `new PrismaClient()`
 
-- **Health score** — 6-dimension weighted score (0–100): activity, documentation freshness, internal consistency, next steps, blockers, focus; 30-day history persisted and charted in UI
+- **Health score** — score ponderado em 6 dimensões (0–100): atividade, atualidade da documentação, consistência interna, próximos passos, bloqueadores, foco; histórico de 30 dias persistido e exibido em gráfico
 
-- **Work modes** — 5 modes (implementation, debugging, architecture, study, review) inject mode-specific system prompt suffix and steer synthesis focus; mode tagged on every message and artifact
+- **Work modes** — 5 modos (implementation, debugging, architecture, study, review) injetam sufixo de system prompt específico e direcionam o foco da síntese; modo registrado em cada mensagem e artefato
 
-- **Hierarchical memory** — events auto-classified at write time (`inbox → working → consolidated → archive`); archived events excluded from LLM context in synthesis and documentation generation
+- **Memória hierárquica** — eventos classificados automaticamente na escrita (`inbox → working → consolidated → archive`); eventos arquivados excluídos do contexto LLM na síntese e geração de documentação
 
-- **Notion integration** — search, read, create, and append Notion pages from chat; markdown converted to Notion block objects (heading_1/2/3, paragraph, bullet, numbered, quote) via custom converter
+- **Integração Notion** — busca, leitura, criação e acréscimo de páginas Notion pelo chat; markdown convertido para blocos Notion (heading_1/2/3, parágrafo, bullet, numerado, citação)
 
-- **Mermaid diagrams** — content engine auto-infers diagram type from prompt keywords (flowchart, sequenceDiagram, erDiagram, classDiagram, gantt) and returns fenced `mermaid` blocks rendered in the frontend
+- **Diagramas Mermaid** — content engine infere tipo de diagrama pelo prompt (flowchart, sequenceDiagram, erDiagram, classDiagram, gantt) e retorna blocos `mermaid` renderizados no frontend
 
 ---
 
-## Reliability
+## Confiabilidade
 
-**48 tests across 6 modules**, enforced in CI:
+**48 testes em 6 módulos**, aplicados no CI:
 
-| Module | What is tested |
+| Módulo | O que é testado |
 |---|---|
-| `ValidationService` | Prompt injection patterns, output schema leak, classification guard, severity levels |
-| `SessionService` | Token aggregate stats, session groupBy, title truncation to 50 chars, fallback title |
-| `VoiceService` | Markdown stripping before TTS, 800-char limit, temp file cleanup in finally |
-| `MemoryService` | Checksum deduplication, Jina API call parameters, pgvector search score mapping, URL indexing error cases |
-| `ExecutionService` | BullMQ `queue.add` parameters: jobId, attempts=3, backoff=5000 |
-| `OrchestratorService` | Classification routing to correct module, `assertValidPrompt` called, response structure |
+| `ValidationService` | Padrões de prompt injection, vazamento de schema, guard de classificação, níveis de severidade |
+| `SessionService` | Stats agregadas de tokens, groupBy de sessão, truncamento de título em 50 chars, título fallback |
+| `VoiceService` | Remoção de markdown antes do TTS, limite de 800 chars, limpeza de arquivo temp no finally |
+| `MemoryService` | Deduplicação por checksum, parâmetros da chamada Jina, mapeamento de score pgvector, erros de URL |
+| `ExecutionService` | Parâmetros do `queue.add`: jobId, attempts=3, backoff=5000 |
+| `OrchestratorService` | Roteamento de classificação para módulo correto, `assertValidPrompt` chamado, estrutura de resposta |
 
-All specs use `{ provide: PrismaService, useValue: mockPrisma }` — no `new PrismaClient()` in tests, consistent with the DI model.
+Todos os specs usam `{ provide: PrismaService, useValue: mockPrisma }` — sem `new PrismaClient()` nos testes.
 
 ```bash
 pnpm test:cov    # jest --coverage  (functions ≥ 80%, branches ≥ 70%)
 ```
 
-See [docs/validation.md](docs/validation.md) for the full validation philosophy and coverage targets.
+Veja [docs/validation.md](docs/validation.md) para a filosofia de validação e metas de cobertura.
 
 ---
 
-## Module reference
+## Referência de módulos
 
 ```
 apps/api/src/modules/
-├── orchestrator/        # Intent classification (gpt-4o-mini, temp=0) + routing + SSE + work modes
-├── memory/              # pgvector semantic search · Jina embeddings · URL + PDF indexing
-├── execution/           # BullMQ task dispatch + jarvis payload builder
-├── document-processing/ # Puppeteer PDF · docxtemplater DOCX · download endpoint
-├── content-engine/      # Long-form content · editorial calendar · Mermaid diagrams
+├── orchestrator/        # Classificação de intent (gpt-4o-mini, temp=0) + roteamento + SSE + work modes
+├── memory/              # Busca semântica pgvector · embeddings Jina · indexação de URL + PDF
+├── execution/           # Despacho de tasks BullMQ + jarvis payload builder
+├── document-processing/ # PDF Puppeteer · DOCX docxtemplater · endpoint de download
+├── content-engine/      # Conteúdo longo · calendário editorial · diagramas Mermaid
 ├── voice/               # Groq PlayAI TTS (POST /voice/synthesize) + Whisper STT (POST /voice/transcribe)
-├── session/             # Conversation history · token stats · session groupBy
-├── validation/          # Prompt injection detection · output validation · classification guard
-├── configuration/       # System personality from rayzen.config.json · work mode config
-├── notion/              # Notion API: search · read page · create page · append · update title
-├── agent-bridge/        # PC Agent authentication (JWT) + BullMQ queue management
-├── auth/                # JWT authentication + ADMIN_PASSWORD guard
-├── project/             # Project CRUD + metadata
-├── project-state/       # Structured state: milestones, backlog, activeFocus · resume brief
-├── health/              # 6-dimension health score (0–100) + 30-day history
-├── synthesis/           # Cross-project synthesis and summarization
-├── documentation/       # Documentation generation and export
-├── proactive/           # 6 proactive rules: inactivity, doc_stale, blocker, next_step, consistency, drift
-├── event/               # Event log with memory_class hierarchy (inbox → working → consolidated → archive)
-├── obsidian/            # Obsidian vault sync
-├── git/                 # Git operations and repository insights
-└── agent-bridge/        # PC Agent authentication + queue
+├── session/             # Histórico de conversa · stats de tokens · session groupBy
+├── validation/          # Detecção de prompt injection · validação de output · guard de classificação
+├── configuration/       # Personalidade do sistema via rayzen.config.json · config de work mode
+├── notion/              # Notion API: busca · leitura · criação · acréscimo · atualização de título
+├── agent-bridge/        # Autenticação JWT do PC Agent + gerenciamento de fila BullMQ
+├── auth/                # Autenticação JWT + guard ADMIN_PASSWORD
+├── project/             # CRUD de projetos + metadados
+├── project-state/       # Estado estruturado: milestones, backlog, activeFocus · resume brief
+├── health/              # Health score 6 dimensões (0–100) + histórico 30 dias
+├── synthesis/           # Síntese e sumarização cross-projeto
+├── documentation/       # Geração e exportação de documentação
+├── proactive/           # 6 regras proativas: inatividade, doc_stale, bloqueador, next_step, consistência, drift
+├── event/               # Log de eventos com hierarquia memory_class (inbox → working → consolidated → archive)
+├── obsidian/            # Sync com vault Obsidian
+└── git/                 # Operações git e insights de repositório
 ```
 
-**LLM model assignments:**
+**Modelos LLM por módulo:**
 
-| Module | Model | Temperature | Notes |
+| Módulo | Modelo | Temperature | Observações |
 |---|---|---|---|
-| Orchestrator — classify | gpt-4o-mini | 0 | `response_format: json_object` enforced |
-| Orchestrator — chat | gpt-4o | 0.7 | Full conversation history included |
-| Memory — synthesis | gpt-4o-mini | 0.3 | Summarizes search results |
-| Document Processing | gpt-4o-mini | 0.2 | Structured, deterministic output |
-| Content Engine | gpt-4o | 0.8 | Creativity-first, no intro preamble |
-| Execution (Jarvis) | gpt-4o | 0.3 | Practical task responses |
+| Orchestrator — classify | gpt-4o-mini | 0 | `response_format: json_object` obrigatório |
+| Orchestrator — chat | gpt-4o | 0.7 | Histórico completo de conversa incluído |
+| Memory — synthesis | gpt-4o-mini | 0.3 | Resume resultados de busca |
+| Document Processing | gpt-4o-mini | 0.2 | Output estruturado e determinístico |
+| Content Engine | gpt-4o | 0.8 | Criatividade em primeiro lugar |
+| Execution (Jarvis) | gpt-4o | 0.3 | Respostas de tarefas práticas |
 | Embeddings | jina-embeddings-v3 | — | 1024-dim, via Jina AI API |
-| Voice TTS | Groq PlayAI Astra | — | Markdown-stripped, 800-char chunks |
-| Voice STT | Groq Whisper | — | Audio file → text |
+| Voice TTS | Groq PlayAI Astra | — | Markdown removido, chunks de 800 chars |
+| Voice STT | Groq Whisper | — | Arquivo de áudio → texto |
 
 ---
 
-## PC Agent actions
+## Ações do PC Agent
 
-The PC Agent runs locally (Windows, `apps/agent/`) and polls Redis every 3 seconds for tasks. Every action is gated by `whitelist.ts` — unknown actions are silently dropped.
+O PC Agent roda localmente (Windows, `apps/agent/`) e faz polling no Redis a cada 3 segundos. Toda ação é controlada pela `whitelist.ts` — ações desconhecidas são descartadas silenciosamente.
 
-| Category | Actions |
+| Categoria | Ações |
 |---|---|
-| Apps & Navigation | `open_app`, `open_url`, `open_vscode` |
-| Files & Directories | `list_dir`, `file_search`, `organize_downloads`, `create_project_folder` |
-| System | `get_system_info`, `screenshot`, `notify`, `clipboard_read`, `clipboard_write` |
+| Apps e Navegação | `open_app`, `open_url`, `open_vscode` |
+| Arquivos e Diretórios | `list_dir`, `file_search`, `organize_downloads`, `create_project_folder` |
+| Sistema | `get_system_info`, `screenshot`, `notify`, `clipboard_read`, `clipboard_write` |
 | Git | `git_status`, `git_log`, `git_branch`, `git_commit` |
-| Terminal & Dev | `run_command`, `run_tests`, `inspect_schema` |
+| Terminal e Dev | `run_command`, `run_tests`, `inspect_schema` |
 | Docker | `docker_ps`, `docker_start`, `docker_stop` |
-| Communication | `read_emails`, `send_email`, `get_calendar` |
+| Comunicação | `read_emails`, `send_email`, `get_calendar` |
 
-**`run_tests`** — invokes Jest, Vitest, or Playwright in any project path; parses stdout for passed/failed/skipped/coverage and returns structured `{ passed, failed, skipped, coverage, failures[] }`. Handles non-zero exit codes (test failures) correctly.
+**`run_tests`** — invoca Jest, Vitest ou Playwright em qualquer caminho de projeto; parseia stdout para passed/failed/skipped/coverage e retorna `{ passed, failed, skipped, coverage, failures[] }`. Trata corretamente exit code != 0 (falhas de teste).
 
-**`inspect_schema`** — reads `schema.prisma` from the target project, parses all models with their fields, types, modifiers, and relations using regex; returns a human-readable summary and a structured `models[]` array.
+**`inspect_schema`** — lê `schema.prisma` do projeto alvo, parseia todos os modelos com campos, tipos, modificadores e relações via regex; retorna resumo legível e array estruturado `models[]`.
 
-Security rules (inegociable, never bypass):
-- Path traversal (`../`) blocked at `list_dir` and `file_search`
-- Directories outside sandbox (`/etc`, `/var`, `/root`, `/sys`) refused
-- `organize_downloads`, `docker_stop`, `git_commit` run with `dryRun: true` by default
-- No free `exec()` or `spawn()` — only typed action handlers
+**Regras de segurança (inegociáveis, nunca bypassar):**
+- Path traversal (`../`) bloqueado em `list_dir` e `file_search`
+- Diretórios fora do sandbox (`/etc`, `/var`, `/root`, `/sys`) recusados
+- `organize_downloads`, `docker_stop`, `git_commit` executam com `dryRun: true` por padrão
+- Sem `exec()` ou `spawn()` livre — apenas handlers de ação tipados
 
-See [docs/agent-runtime.md](docs/agent-runtime.md) for the full security model and how to add new actions.
+Veja [docs/agent-runtime.md](docs/agent-runtime.md) para o modelo de segurança completo e como adicionar novas ações.
 
 ---
 
 ## Quick start
 
-**Prerequisites:** Node.js 20 LTS, pnpm 9.x, Docker Desktop
+**Pré-requisitos:** Node.js 20 LTS, pnpm 9.x, Docker Desktop
 
 ```bash
 git clone https://github.com/marcelorayzen/rayzen-ai.git
 cd rayzen-ai
 pnpm install
 cp .env.example .env
-# Fill in API keys (see below)
+# Preencha as API keys (veja abaixo)
 ```
 
-**Required environment variables** (in `apps/api/.env`):
+**Variáveis de ambiente obrigatórias** (em `apps/api/.env`):
 
 ```bash
 # LLM
 OPENAI_API_KEY=sk-proj-...        # openai.com
-GROQ_API_KEY=gsk_...              # groq.com — free tier
-JINA_API_KEY=jina_...             # jina.ai  — free tier
+GROQ_API_KEY=gsk_...              # groq.com — plano gratuito disponível
+JINA_API_KEY=jina_...             # jina.ai  — plano gratuito disponível
 
-# LiteLLM proxy (Docker sidecar)
+# Proxy LiteLLM (sidecar Docker)
 LITELLM_BASE_URL=http://localhost:4000/v1
-LITELLM_MASTER_KEY=sk-rayzen-anything
+LITELLM_MASTER_KEY=sk-rayzen-qualquer-coisa
 
-# Infrastructure
-DATABASE_URL=postgresql://rayzen:password@localhost:5432/rayzen_ai
+# Infraestrutura
+DATABASE_URL=postgresql://rayzen:senha@localhost:5432/rayzen_ai
 REDIS_URL=redis://localhost:6379
 
 # Auth
 JWT_SECRET=$(openssl rand -hex 32)
-ADMIN_PASSWORD=yourpassword
+ADMIN_PASSWORD=sua_senha
 
-# Optional integrations
-NOTION_API_KEY=ntn_...            # Notion integration
-NOTION_DATABASE_ID=               # Default database for new pages
+# Integrações opcionais
+NOTION_API_KEY=ntn_...            # Integração com Notion
+NOTION_DATABASE_ID=               # Database padrão para novas páginas
 ```
 
-**Option A — Windows shortcut (recommended):**
+**Opção A — Atalho Windows (recomendado):**
 
 ```
-Double-click dev-start.bat
+Duplo clique em dev-start.bat
 ```
 
-Starts Docker infra, preserves all volume data, opens 3 terminal windows (API, Web, Agent).
+Inicia a infra Docker, preserva todos os dados dos volumes, abre 3 janelas de terminal (API, Web, Agent).
 
-**Option B — manual:**
+**Opção B — Manual:**
 
 ```bash
 docker compose up -d postgres redis litellm
 
-pnpm db:migrate        # apply schema (pgvector extension required)
+pnpm db:migrate        # aplica o schema (extensão pgvector necessária)
 
 pnpm dev:api           # API  → http://localhost:3001
 pnpm dev:web           # Web  → http://localhost:3000
-pnpm dev:agent         # PC Agent (required for Execution module)
+pnpm dev:agent         # PC Agent (necessário para o módulo Execution)
 ```
 
-Open **http://localhost:3000** and log in with `ADMIN_PASSWORD`.
+Abra **http://localhost:3000** e faça login com `ADMIN_PASSWORD`.
 
-> **Data persistence:** PostgreSQL and Redis use named Docker volumes (`pg_data`, `redis_data`). Restarting containers (even after system reboot) preserves all data. Data is only lost if you run `docker compose down -v`.
+> **Persistência de dados:** PostgreSQL e Redis usam volumes Docker nomeados (`pg_data`, `redis_data`). Reiniciar containers (inclusive após reboot) preserva todos os dados. Os dados só são perdidos com `docker compose down -v`.
 
 ---
 
-## Development commands
+## Comandos de desenvolvimento
 
 ```bash
-pnpm typecheck       # TypeScript zero-errors target (all workspaces)
-pnpm lint            # ESLint across all apps
+pnpm typecheck       # TypeScript zero erros (todos os workspaces)
+pnpm lint            # ESLint em todos os apps
 pnpm test            # Jest
-pnpm test:cov        # Jest + coverage report (functions ≥ 80%)
-pnpm db:migrate      # Apply Prisma migrations
-pnpm db:studio       # Prisma Studio at http://localhost:5555
-pnpm build           # Build all apps
-git push origin main # Triggers CI → automatic SSH deploy to Oracle VPS
+pnpm test:cov        # Jest + relatório de coverage (functions ≥ 80%)
+pnpm db:migrate      # Aplicar migrations Prisma
+pnpm db:studio       # Prisma Studio em http://localhost:5555
+pnpm build           # Build de todos os apps
+git push origin main # Dispara CI → deploy SSH automático na Oracle VPS
 ```
 
 ---
 
 ## Stack
 
-| Layer | Technology | Version |
+| Camada | Tecnologia | Versão |
 |---|---|---|
 | Frontend | Next.js App Router | 15.x |
 | Backend | NestJS + Fastify | 10.x |
-| LLM proxy | LiteLLM | latest |
+| Proxy LLM | LiteLLM | latest |
 | Embeddings | Jina AI (jina-embeddings-v3) | 1024-dim |
-| Database | PostgreSQL + pgvector | 16 + 0.7 |
-| Cache / Queue | Redis + BullMQ | 7.x + 5.x |
+| Banco de dados | PostgreSQL + pgvector | 16 + 0.7 |
+| Cache / Fila | Redis + BullMQ | 7.x + 5.x |
 | ORM | Prisma | 5.x |
 | PDF | Puppeteer | 22.x |
 | DOCX | docxtemplater | 3.x |
-| Voice | Groq (PlayAI Astra TTS + Whisper STT) | — |
+| Voz | Groq (PlayAI Astra TTS + Whisper STT) | — |
 | Notion | @notionhq/client | latest |
-| Diagrams | Mermaid (fenced block, rendered in Next.js) | — |
+| Diagramas | Mermaid (bloco fenced, renderizado no Next.js) | — |
 | Agent | Node.js TypeScript | 20 LTS |
 | Container | Docker Compose | v2 |
-| CI/CD | GitHub Actions + SSH deploy | — |
+| CI/CD | GitHub Actions + deploy SSH | — |
 | VPS | Oracle Ampere A1 free tier | Ubuntu 24.04 |
 
 ---
 
-## Documentation
+## Documentação
 
-| File | Contents |
+| Arquivo | Conteúdo |
 |---|---|
-| [docs/architecture.md](docs/architecture.md) | Full system diagram, module catalogue, data stores, LiteLLM model assignments |
-| [docs/workflows.md](docs/workflows.md) | 5 end-to-end flows: memory indexing, routing, PC agent, voice, doc gen |
-| [docs/validation.md](docs/validation.md) | Validation philosophy, what is detected, coverage targets |
-| [docs/agent-runtime.md](docs/agent-runtime.md) | Security model, 26-action catalogue, dry-run protocol, adding new actions |
-| [docs/engineering-standards.md](docs/engineering-standards.md) | DI rules, PrismaService, LLM proxy, security, when to write a spec |
-| [docs/getting-started.md](docs/getting-started.md) | Detailed setup guide |
-| [docs/personalization.md](docs/personalization.md) | System persona and behaviour configuration |
-| [docs/roadmap.md](docs/roadmap.md) | Phase roadmap and current status |
+| [docs/architecture.md](docs/architecture.md) | Diagrama completo do sistema, catálogo de módulos, data stores, LiteLLM |
+| [docs/workflows.md](docs/workflows.md) | 5 fluxos end-to-end: indexação de memória, roteamento, PC agent, voz, geração de doc |
+| [docs/validation.md](docs/validation.md) | Filosofia de validação, o que é detectado, metas de cobertura |
+| [docs/agent-runtime.md](docs/agent-runtime.md) | Modelo de segurança, catálogo de 26 ações, protocolo dry-run, como adicionar ações |
+| [docs/engineering-standards.md](docs/engineering-standards.md) | Regras de DI, PrismaService, proxy LLM, segurança, quando escrever spec |
+| [docs/getting-started.md](docs/getting-started.md) | Guia de setup detalhado |
+| [docs/personalization.md](docs/personalization.md) | Configuração de persona e comportamento do sistema |
+| [docs/roadmap.md](docs/roadmap.md) | Roadmap de fases e status atual |
 
 ---
 
-## Local dev URLs
+## URLs locais
 
-| Service | URL |
+| Serviço | URL |
 |---|---|
 | Web | http://localhost:3000 |
 | API / Swagger | http://localhost:3001/docs |
@@ -338,6 +397,6 @@ git push origin main # Triggers CI → automatic SSH deploy to Oracle VPS
 
 <div align="center">
 
-<sub>Built by <a href="https://github.com/marcelorayzen">Marcelo Rayzen</a> · 100% TypeScript · NestJS + Next.js monorepo · Oracle VPS free tier</sub>
+<sub>Desenvolvido por <a href="https://github.com/marcelorayzen">Marcelo Rayzen</a> · 100% TypeScript · monorepo NestJS + Next.js · Oracle VPS free tier</sub>
 
 </div>
