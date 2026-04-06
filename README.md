@@ -25,6 +25,8 @@
 | "Generate a PDF report from this data" | Document Processing | Puppeteer renders HTML → PDF |
 | "Write a LinkedIn post about this article" | Content Engine | LLM with high-creativity prompt, returns formatted text |
 | "Read that message back to me" | Voice | Groq PlayAI TTS, markdown-stripped, 800-char limit |
+| "How healthy is this project?" | Health Score | 6-dimension weighted score (0–100) with 30-day history chart |
+| "Where did I stop? What changed?" | Resume Brief | `POST /projects/:id/resume` — structured catch-up in seconds |
 
 ---
 
@@ -59,6 +61,9 @@ See [docs/architecture.md](docs/architecture.md) for the full diagram and module
 - **Validation layer** — dedicated `ValidationModule` detects prompt injection and system-prompt leakage before any LLM call
 - **pgvector semantic memory** — 1024-dimension Jina embeddings stored in PostgreSQL; conversation itself is indexed for continuous learning
 - **Streaming SSE** — chat responses stream token-by-token with typewriter effect; session history persisted with per-call `tokens_used`
+- **Health score** — 6-dimension weighted score (0–100): activity, documentation freshness, consistency, next steps, blockers, focus; 30-day history persisted and charted in UI
+- **Work modes** — 5 modes (implementation, debugging, architecture, study, review) inject mode-specific system prompt suffix and steer synthesis focus; mode tagged on every message and artifact
+- **Hierarchical memory** — events auto-classified at write time (inbox → working → consolidated → archive); archived events excluded from LLM context in synthesis and documentation generation
 
 ---
 
@@ -87,7 +92,7 @@ See [docs/validation.md](docs/validation.md) for validation philosophy and cover
 
 ```
 apps/api/src/modules/
-├── orchestrator/        # intent classification + routing + SSE
+├── orchestrator/        # intent classification + routing + SSE + work modes
 ├── memory/              # pgvector semantic search + document indexing
 ├── execution/           # BullMQ task dispatch to PC Agent
 ├── document-processing/ # Puppeteer PDF + docxtemplater DOCX
@@ -97,7 +102,11 @@ apps/api/src/modules/
 ├── validation/          # prompt injection + output validation
 ├── configuration/       # system personality config
 ├── agent-bridge/        # PC Agent authentication + queue
-└── auth/                # JWT authentication
+├── auth/                # JWT authentication
+├── project-state/       # structured state: milestones, backlog, activeFocus, resume brief
+├── health/              # 6-dimension health score + 30-day history
+├── proactive/           # 6 rules: inactivity, doc_stale, blocker, next_step, consistency, drift
+└── event/               # event log with memory_class hierarchy (inbox→archive)
 ```
 
 ---

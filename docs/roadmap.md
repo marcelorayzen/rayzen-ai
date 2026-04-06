@@ -345,10 +345,10 @@ Cada fase tem escopo mínimo e critério de done explícito. Nada avança sem o 
 | Fase 8 — Confiança e rastreabilidade | ✅ Concluído |
 | Fase 9 — Git-aware context | ✅ Concluído |
 | Fase 10 — Inteligência proativa | ✅ Concluído |
-| Fase 11 — Planejamento operacional | 🔲 Não iniciado |
-| Fase 12 — Health score | 🔲 Não iniciado |
-| Fase 13 — Memória hierárquica | 🔲 Não iniciado |
-| Fase 14 — Work modes | 🔲 Não iniciado |
+| Fase 11 — Planejamento operacional | ✅ Concluído |
+| Fase 12 — Health score | ✅ Concluído |
+| Fase 13 — Memória hierárquica | ✅ Concluído |
+| Fase 14 — Work modes | ✅ Concluído |
 
 ---
 
