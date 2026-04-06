@@ -67,6 +67,7 @@ model SessionArtifact {
   projectId String?  @map("project_id")
   sessionId String   @map("session_id")
   type      String   @default("synthesis") // synthesis | checkpoint
+  workMode  String?  @map("work_mode")    // implementation | debugging | architecture | study | review
   content   Json     // { summary, decisions[], next_steps[], learnings[], confidence }
   sourceIds Json     @default("[]") @map("source_ids") // IDs dos eventos usados para gerar
   createdAt DateTime @default(now()) @map("created_at")
@@ -186,6 +187,7 @@ model ConversationMessage {
   content        String
   tokensUsed     Int?     @map("tokens_used")
   projectId      String?  @map("project_id")
+  workMode       String?  @map("work_mode") // implementation | debugging | architecture | study | review
   createdAt      DateTime @default(now()) @map("created_at")
 
   project Project? @relation(fields: [projectId], references: [id])

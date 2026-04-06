@@ -9,14 +9,14 @@ export class SynthesisController {
 
   @Post('session')
   @ApiOperation({ summary: 'Sintetizar sessão: extrai decisions, next_steps, learnings via LLM' })
-  synthesize(@Body() body: { sessionId: string; projectId?: string }) {
-    return this.svc.synthesizeSession(body.sessionId, body.projectId)
+  synthesize(@Body() body: { sessionId: string; projectId?: string; workMode?: string }) {
+    return this.svc.synthesizeSession(body.sessionId, body.projectId, body.workMode)
   }
 
   @Post('checkpoint')
   @ApiOperation({ summary: 'Checkpoint manual: sintetiza atividade desde o último checkpoint ou últimas 2h' })
-  checkpoint(@Body() body: { projectId: string; note?: string }) {
-    return this.svc.checkpoint(body.projectId, body.note)
+  checkpoint(@Body() body: { projectId: string; note?: string; workMode?: string }) {
+    return this.svc.checkpoint(body.projectId, body.note, body.workMode)
   }
 
   @Get('artifacts')

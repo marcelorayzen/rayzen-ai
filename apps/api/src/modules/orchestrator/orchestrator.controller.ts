@@ -17,6 +17,10 @@ class PromptDto {
   @IsOptional()
   @IsString()
   projectId?: string
+
+  @IsOptional()
+  @IsString()
+  workMode?: string
 }
 
 @ApiTags('orchestrator')
@@ -28,7 +32,7 @@ export class OrchestratorController {
   @Post()
   handle(@Body() dto: PromptDto) {
     const sessionId = dto.sessionId ?? randomUUID()
-    return this.svc.handleMessage(dto.prompt, sessionId, dto.projectId)
+    return this.svc.handleMessage(dto.prompt, sessionId, dto.projectId, dto.workMode)
   }
 
   @Post('stream')
@@ -55,7 +59,7 @@ export class OrchestratorController {
       // Módulos não-streaming (jarvis, brain, doc, content) — usa handleMessage normal
       const nonStreaming = ['jarvis', 'brain', 'doc', 'content']
       if (nonStreaming.includes(classify.module)) {
-        const result = await this.svc.handleMessage(dto.prompt, sessionId, dto.projectId)
+        const result = await this.svc.handleMessage(dto.prompt, sessionId, dto.projectId, dto.workMode)
         send('token', { text: result.reply })
         send('done', { tokensUsed: result.tokensUsed, sessionId })
         reply.raw.end()
@@ -65,7 +69,7 @@ export class OrchestratorController {
       // Chat geral — streaming real
       await this.svc.streamChat(dto.prompt, sessionId, classify.module, (token) => {
         send('token', { text: token })
-      }, dto.projectId)
+      }, dto.projectId, dto.workMode)
 
       send('done', { tokensUsed: 0, sessionId })
     } catch (err) {

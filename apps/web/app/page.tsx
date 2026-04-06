@@ -122,6 +122,7 @@ interface GitContext {
 
 type QuickCaptureIntent = 'decision' | 'idea' | 'problem' | 'reference'
 type MemoryClassFilter = 'all' | 'inbox' | 'working' | 'consolidated' | 'archive'
+type WorkMode = 'implementation' | 'debugging' | 'architecture' | 'study' | 'review'
 
 interface Recommendation {
   id: string
@@ -196,6 +197,7 @@ export default function Home() {
   const [quickCaptureSaving, setQuickCaptureSaving] = useState(false)
   const [healthOpen, setHealthOpen] = useState(false)
   const [healthData, setHealthData] = useState<HealthData | null>(null)
+  const [workMode, setWorkMode] = useState<WorkMode | null>(null)
   const [importOpen, setImportOpen] = useState(false)
   const [importTab, setImportTab] = useState<ImportTab>('github')
   const [importLoading, setImportLoading] = useState(false)
@@ -357,7 +359,7 @@ export default function Home() {
       const res = await fetch(`${API_URL}/synthesis/session`, {
         method: 'POST',
         headers: authHeaders({ 'Content-Type': 'application/json' }),
-        body: JSON.stringify({ sessionId, ...(activeProjectId ? { projectId: activeProjectId } : {}) }),
+        body: JSON.stringify({ sessionId, ...(activeProjectId ? { projectId: activeProjectId } : {}), ...(workMode ? { workMode } : {}) }),
       })
       const artifact = await res.json() as SynthesisArtifact
       setSynthesisArtifacts(prev => [artifact, ...prev])
@@ -496,7 +498,7 @@ export default function Home() {
       const res = await fetch(`${API_URL}/synthesis/checkpoint`, {
         method: 'POST',
         headers: authHeaders({ 'Content-Type': 'application/json' }),
-        body: JSON.stringify({ projectId: activeProjectId }),
+        body: JSON.stringify({ projectId: activeProjectId, ...(workMode ? { workMode } : {}) }),
       })
       if (res.ok) {
         const artifact = await res.json() as SynthesisArtifact
@@ -711,7 +713,7 @@ export default function Home() {
       const res = await fetch(`${API_URL}/orchestrate/stream`, {
         method: 'POST',
         headers: authHeaders({ 'Content-Type': 'application/json' }),
-        body: JSON.stringify({ prompt: userMessage, sessionId, ...(activeProjectId ? { projectId: activeProjectId } : {}) }),
+        body: JSON.stringify({ prompt: userMessage, sessionId, ...(activeProjectId ? { projectId: activeProjectId } : {}), ...(workMode ? { workMode } : {}) }),
       })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
 
@@ -1729,6 +1731,21 @@ export default function Home() {
               ))}
             </select>
           )}
+          {activeProjectId && (
+            <select
+              value={workMode ?? ''}
+              onChange={(e) => setWorkMode((e.target.value as WorkMode) || null)}
+              className="bg-zinc-800 border border-zinc-700 text-zinc-300 text-xs rounded-lg px-2 py-1.5 focus:outline-none focus:border-zinc-500"
+              title="Modo de trabalho"
+            >
+              <option value="">modo livre</option>
+              <option value="implementation">implementação</option>
+              <option value="debugging">debugging</option>
+              <option value="architecture">arquitetura</option>
+              <option value="study">estudo</option>
+              <option value="review">revisão</option>
+            </select>
+          )}
           {activeProjectId && projectState && (
             <button
               onClick={() => setStateOpen(true)}
@@ -1866,6 +1883,9 @@ export default function Home() {
                 <div className="mt-2 flex items-center gap-3">
                   {msg.module && (
                     <span className="text-xs text-zinc-500">módulo: {MODULE_LABELS[msg.module] ?? msg.module}</span>
+                  )}
+                  {workMode && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-700 text-zinc-400 font-mono">{workMode}</span>
                   )}
                   <button
                     onClick={() => playAudio(msg.content, i)}

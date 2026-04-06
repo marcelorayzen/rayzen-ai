@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config'
 import { PrismaClient } from '@prisma/client'
 import OpenAI from 'openai'
 import { TaskModule, ChatMessage } from '@rayzen/types'
+import { getWorkModeConfig } from './work-modes'
 import { MemoryService } from '../memory/memory.service'
 import { DocumentProcessingService } from '../document-processing/document-processing.service'
 import { ExecutionService } from '../execution/execution.service'
@@ -247,7 +248,7 @@ export class OrchestratorService {
     return `Você é ${name}. ${personality}\n${roles[module] ?? ''}\nIdioma: ${langLabel}.`
   }
 
-  async handleMessage(prompt: string, sessionId: string, projectId?: string): Promise<OrchestrateResult> {
+  async handleMessage(prompt: string, sessionId: string, projectId?: string, workMode?: string): Promise<OrchestrateResult> {
     // 0. Validar prompt antes de qualquer processamento
     this.validation.assertValidPrompt(prompt)
 
@@ -377,8 +378,10 @@ Seja direto, claro e amigável. Português brasileiro. Sem JSON bruto.`,
       content: m.content,
     }))
 
-    // 3. Gerar resposta com contexto do módulo
-    const systemPrompt = MODULE_SYSTEM_PROMPTS[classify.module] ?? DEFAULT_SYSTEM_PROMPT
+    // 3. Gerar resposta com contexto do módulo + work mode
+    const basePrompt = MODULE_SYSTEM_PROMPTS[classify.module] ?? DEFAULT_SYSTEM_PROMPT
+    const modeConfig = getWorkModeConfig(workMode)
+    const systemPrompt = modeConfig ? basePrompt + modeConfig.systemPromptSuffix : basePrompt
     const messages: ChatMessage[] = [...historyMessages, { role: 'user', content: prompt }]
 
     const res = await this.llm.chat.completions.create({
@@ -393,8 +396,8 @@ Seja direto, claro e amigável. Português brasileiro. Sem JSON bruto.`,
     // 4. Salvar mensagens no banco
     await this.prisma.conversationMessage.createMany({
       data: [
-        { sessionId, module: classify.module, role: 'user', content: prompt, projectId },
-        { sessionId, module: classify.module, role: 'assistant', content: reply, tokensUsed, projectId },
+        { sessionId, module: classify.module, role: 'user', content: prompt, projectId, workMode: workMode ?? null },
+        { sessionId, module: classify.module, role: 'assistant', content: reply, tokensUsed, projectId, workMode: workMode ?? null },
       ],
     })
 
@@ -485,7 +488,7 @@ Seja criterioso — não memorize perguntas, comandos ou respostas genéricas.`,
     }
   }
 
-  async streamChat(prompt: string, sessionId: string, module: string, onToken: (token: string) => void, projectId?: string): Promise<void> {
+  async streamChat(prompt: string, sessionId: string, module: string, onToken: (token: string) => void, projectId?: string, workMode?: string): Promise<void> {
     const history = await this.prisma.conversationMessage.findMany({
       where: { sessionId },
       orderBy: { createdAt: 'asc' },
@@ -497,7 +500,9 @@ Seja criterioso — não memorize perguntas, comandos ou respostas genéricas.`,
       content: m.content,
     }))
 
-    const systemPrompt = this.getSystemPrompt(module)
+    const basePrompt = this.getSystemPrompt(module)
+    const modeConfig = getWorkModeConfig(workMode)
+    const systemPrompt = modeConfig ? basePrompt + modeConfig.systemPromptSuffix : basePrompt
     const messages: ChatMessage[] = [...historyMessages, { role: 'user', content: prompt }]
 
     const stream = await this.llm.chat.completions.create({
@@ -521,8 +526,8 @@ Seja criterioso — não memorize perguntas, comandos ou respostas genéricas.`,
 
     await this.prisma.conversationMessage.createMany({
       data: [
-        { sessionId, module, role: 'user', content: prompt, projectId },
-        { sessionId, module, role: 'assistant', content: fullReply, tokensUsed, projectId },
+        { sessionId, module, role: 'user', content: prompt, projectId, workMode: workMode ?? null },
+        { sessionId, module, role: 'assistant', content: fullReply, tokensUsed, projectId, workMode: workMode ?? null },
       ],
     })
 

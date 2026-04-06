@@ -2,6 +2,7 @@ import { Injectable, BadRequestException } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { PrismaClient } from '@prisma/client'
 import OpenAI from 'openai'
+import { getWorkModeConfig } from '../orchestrator/work-modes'
 
 export interface SynthesisResult {
   summary: string
@@ -23,7 +24,7 @@ export class SynthesisService {
     })
   }
 
-  async synthesizeSession(sessionId: string, projectId?: string): Promise<SessionArtifactResponse> {
+  async synthesizeSession(sessionId: string, projectId?: string, workMode?: string): Promise<SessionArtifactResponse> {
     const [messages, events] = await Promise.all([
       this.prisma.conversationMessage.findMany({
         where: { sessionId },
@@ -40,7 +41,7 @@ export class SynthesisService {
       throw new BadRequestException('Sessão sem conteúdo para sintetizar')
     }
 
-    const synthesis = await this.runSynthesis({ messages, events, label: 'sessão' })
+    const synthesis = await this.runSynthesis({ messages, events, label: 'sessão', workMode })
     const sourceIds = events.map(e => e.id)
 
     const artifact = await this.prisma.sessionArtifact.create({
@@ -48,6 +49,7 @@ export class SynthesisService {
         sessionId,
         projectId: projectId ?? null,
         type: 'synthesis',
+        workMode: workMode ?? null,
         content: synthesis as object,
         sourceIds: sourceIds as object,
       },
@@ -56,7 +58,7 @@ export class SynthesisService {
     return { id: artifact.id, sessionId, projectId, synthesis, createdAt: artifact.createdAt.toISOString() }
   }
 
-  async checkpoint(projectId: string, note?: string): Promise<SessionArtifactResponse> {
+  async checkpoint(projectId: string, note?: string, workMode?: string): Promise<SessionArtifactResponse> {
     // Buscar eventos das últimas 2h ou desde o último checkpoint
     const lastCheckpoint = await this.prisma.sessionArtifact.findFirst({
       where: { projectId, type: 'checkpoint' },
@@ -88,7 +90,7 @@ export class SynthesisService {
       throw new BadRequestException('Nenhuma atividade desde o último checkpoint')
     }
 
-    const synthesis = await this.runSynthesis({ messages, events, label: 'checkpoint', note })
+    const synthesis = await this.runSynthesis({ messages, events, label: 'checkpoint', note, workMode })
     const sourceIds = events.map(e => e.id)
 
     const checkpointId = `checkpoint-${Date.now()}`
@@ -97,6 +99,7 @@ export class SynthesisService {
         sessionId: checkpointId,
         projectId,
         type: 'checkpoint',
+        workMode: workMode ?? null,
         content: synthesis as object,
         sourceIds: sourceIds as object,
       },
@@ -151,6 +154,7 @@ export class SynthesisService {
     events: Array<{ source: string; type: string; intent?: string | null; content: string; metadata: unknown }>
     label: string
     note?: string
+    workMode?: string
   }): Promise<SynthesisResult> {
     const chatLines = opts.messages
       .map(m => `${m.role === 'user' ? 'Usuário' : 'Assistente'}: ${m.content.slice(0, 300)}`)
@@ -178,7 +182,12 @@ export class SynthesisService {
 
     const totalItems = opts.messages.length + opts.events.length
 
-    const prompt = `Analise esta ${opts.label} de trabalho e extraia em JSON:
+    const modeConfig = getWorkModeConfig(opts.workMode)
+    const synthesisFocusLine = modeConfig
+      ? `\nFoco desta síntese (modo ${modeConfig.label}): ${modeConfig.synthesisFocus}`
+      : ''
+
+    const prompt = `Analise esta ${opts.label} de trabalho e extraia em JSON:${synthesisFocusLine}
 
 ${context}
 
