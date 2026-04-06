@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common'
-import { PrismaClient } from '@prisma/client'
+import { PrismaService } from '../../prisma/prisma.service'
 
 export interface HealthBreakdown {
   activity: number        // 0–100
@@ -29,7 +29,7 @@ const WEIGHTS = {
 
 @Injectable()
 export class HealthScoreService {
-  private prisma = new PrismaClient()
+  constructor(private readonly prisma: PrismaService) {}
 
   async compute(projectId: string): Promise<HealthScoreRecord> {
     const now = Date.now()

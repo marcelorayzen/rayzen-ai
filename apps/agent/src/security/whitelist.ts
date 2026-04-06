@@ -25,6 +25,8 @@ export const ALLOWED_ACTIONS = new Set([
 
   // Terminal
   'jarvis:run_command',
+  'jarvis:run_tests',
+  'jarvis:inspect_schema',
 
   // Docker
   'jarvis:docker_ps',

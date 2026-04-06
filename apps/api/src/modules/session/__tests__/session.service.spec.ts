@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing'
 import { SessionService } from '../session.service'
+import { PrismaService } from '../../../prisma/prisma.service'
 
 const mockPrisma = {
   conversationMessage: {
@@ -10,10 +11,6 @@ const mockPrisma = {
   },
 }
 
-jest.mock('@prisma/client', () => ({
-  PrismaClient: jest.fn().mockImplementation(() => mockPrisma),
-}))
-
 describe('SessionService', () => {
   let service: SessionService
 
@@ -21,7 +18,10 @@ describe('SessionService', () => {
     jest.clearAllMocks()
 
     const module: TestingModule = await Test.createTestingModule({
-      providers: [SessionService],
+      providers: [
+        SessionService,
+        { provide: PrismaService, useValue: mockPrisma },
+      ],
     }).compile()
 
     service = module.get<SessionService>(SessionService)

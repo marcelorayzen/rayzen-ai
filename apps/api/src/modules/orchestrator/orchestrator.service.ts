@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
-import { PrismaClient } from '@prisma/client'
+import { PrismaService } from '../../prisma/prisma.service'
 import OpenAI from 'openai'
 import { TaskModule, ChatMessage } from '@rayzen/types'
 import { getWorkModeConfig } from './work-modes'
@@ -11,151 +11,7 @@ import { ContentEngineService } from '../content-engine/content-engine.service'
 import { RayzenConfigService } from '../configuration/configuration.service'
 import { ValidationService } from '../validation/validation.service'
 import { EventService } from '../event/event.service'
-import * as os from 'os'
-
-const HOME = process.env.USERPROFILE ?? process.env.HOME ?? os.homedir()
-
-const PATH_KEYWORDS: Record<string, string> = {
-  downloads: HOME + '\\Downloads',
-  documentos: HOME + '\\Documents',
-  documents: HOME + '\\Documents',
-  desktop: HOME + '\\Desktop',
-  'área de trabalho': HOME + '\\Desktop',
-  projetos: HOME + '\\Projects',
-  projects: HOME + '\\Projects',
-}
-
-function buildJarvisPayload(action: string, prompt: string): Record<string, unknown> {
-  if (action === 'list_dir' || action === 'organize_downloads') {
-    const lower = prompt.toLowerCase()
-    for (const [keyword, path] of Object.entries(PATH_KEYWORDS)) {
-      if (lower.includes(keyword)) {
-        return { path, dryRun: action === 'organize_downloads' ? true : undefined }
-      }
-    }
-    return { path: HOME + '\\Downloads' }
-  }
-
-  if (action === 'open_app') {
-    const apps = ['chrome', 'code', 'firefox', 'notion', 'slack']
-    const lower = prompt.toLowerCase()
-    const app = apps.find((a) => lower.includes(a)) ?? 'chrome'
-    return { app }
-  }
-
-  if (action === 'get_system_info') {
-    return {}
-  }
-
-  if (action === 'open_url') {
-    // Extrai URL do prompt
-    const urlMatch = prompt.match(/https?:\/\/[^\s]+/) ?? prompt.match(/(?:youtube\.com|youtu\.be|github\.com|spotify\.com|notion\.so)[^\s]*/i)
-    if (urlMatch) return { url: urlMatch[0] }
-    // Monta URL de busca YouTube se mencionar música
-    const lower = prompt.toLowerCase()
-    if (lower.includes('youtube') || lower.includes('música') || lower.includes('musica') || lower.includes('video')) {
-      const query = prompt.replace(/abr[ea]|coloc[ae]|toc[ae]|play|youtube|música|musica|video/gi, '').trim()
-      return { url: `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}` }
-    }
-    return { url: 'https://www.youtube.com' }
-  }
-
-  if (action === 'open_vscode') {
-    const lower = prompt.toLowerCase()
-    for (const [keyword, path] of Object.entries(PATH_KEYWORDS)) {
-      if (lower.includes(keyword)) return { path }
-    }
-    // Tenta extrair nome de projeto do prompt
-    const match = prompt.match(/(?:abr[ae]|open)\s+(?:o projeto\s+)?(.+?)(?:\s+no vscode|$)/i)
-    if (match) return { path: 'C:\\Projects\\' + match[1].trim() }
-    return {}
-  }
-
-  if (action === 'create_project_folder') {
-    const lower = prompt.toLowerCase()
-    const template = lower.includes('next') ? 'nextjs'
-      : lower.includes('node') || lower.includes('api') ? 'node'
-      : lower.includes('python') ? 'python'
-      : 'blank'
-    // Extrai nome: "crie um projeto chamado X" ou "novo projeto X"
-    const nameMatch = prompt.match(/(?:chamado|projeto|project|criar|crie|novo)\s+([a-zA-Z0-9_\- ]+?)(?:\s+com|\s+usando|\s+em|$)/i)
-    const name = nameMatch ? nameMatch[1].trim() : 'novo-projeto'
-    return { name, template, openVscode: true, dryRun: false }
-  }
-
-  if (action === 'read_emails') {
-    const limitMatch = prompt.match(/(\d+)\s*(?:email|e-mail|mensagem)/i)
-    return { limit: limitMatch ? parseInt(limitMatch[1]) : 5 }
-  }
-
-  if (action === 'send_email') {
-    return { prompt, dryRun: false }
-  }
-
-  if (action === 'get_calendar') {
-    const daysMatch = prompt.match(/(\d+)\s*dia/i)
-    return { days: daysMatch ? parseInt(daysMatch[1]) : 1 }
-  }
-
-  if (action === 'git_status' || action === 'git_log' || action === 'git_branch' || action === 'git_commit') {
-    const lower = prompt.toLowerCase()
-    // Tenta extrair nome do projeto do prompt
-    const projectMatch = prompt.match(/(?:projeto|repo|reposit[oó]rio|project)\s+([a-zA-Z0-9_\-]+)/i)
-    const path = projectMatch ? `C:\\Projects\\${projectMatch[1]}` : 'C:\\Projects\\rayzen-ai'
-    if (action === 'git_commit') {
-      const msgMatch = prompt.match(/(?:commit|mensagem|message)\s+[""']?(.+?)[""']?$/i)
-      return { path, message: msgMatch ? msgMatch[1] : prompt, dryRun: false }
-    }
-    if (action === 'git_branch') {
-      const branchMatch = prompt.match(/(?:branch|rama|cria[r]?|criar)\s+([a-zA-Z0-9_\-/]+)/i)
-      return { path, name: branchMatch ? branchMatch[1] : undefined }
-    }
-    return { path, limit: 10 }
-  }
-
-  if (action === 'run_command') {
-    const lower = prompt.toLowerCase()
-    const projectMatch = prompt.match(/(?:no projeto|in|projeto)\s+([a-zA-Z0-9_\-]+)/i)
-    const path = projectMatch ? `C:\\Projects\\${projectMatch[1]}` : undefined
-    return { command: lower, path }
-  }
-
-  if (action === 'docker_ps') return {}
-
-  if (action === 'docker_start' || action === 'docker_stop') {
-    const nameMatch = prompt.match(/(?:container|servi[çc]o|start|stop|inicia[r]?|para[r]?)\s+([a-zA-Z0-9_\-]+)/i)
-    return { name: nameMatch ? nameMatch[1] : '', dryRun: false }
-  }
-
-  if (action === 'screenshot') return {}
-
-  if (action === 'notify') {
-    const titleMatch = prompt.match(/(?:título|title|assunto)\s+[""']?(.+?)[""']?(?:\s+mensagem|\s+com|$)/i)
-    const msgMatch = prompt.match(/(?:mensagem|message|diz[er]?|fala[r]?)\s+[""']?(.+?)[""']?$/i)
-    return {
-      title: titleMatch ? titleMatch[1] : 'Rayzen AI',
-      message: msgMatch ? msgMatch[1] : prompt,
-    }
-  }
-
-  if (action === 'clipboard_read') return {}
-
-  if (action === 'clipboard_write') {
-    const textMatch = prompt.match(/(?:copiar?|escrever?|colar?|clipboard)\s+[""']?(.+?)[""']?$/i)
-    return { text: textMatch ? textMatch[1] : prompt }
-  }
-
-  if (action === 'file_search') {
-    const queryMatch = prompt.match(/(?:procura[r]?|busca[r]?|encontra[r]?|acha[r]?|find|search)\s+(?:arquivo\s+)?[""']?(.+?)[""']?(?:\s+em|$)/i)
-    const pathMatch = prompt.match(/(?:\s+em\s+)(.+?)$/i)
-    return {
-      query: queryMatch ? queryMatch[1] : prompt,
-      path: pathMatch ? pathMatch[1].trim() : undefined,
-    }
-  }
-
-  return { prompt }
-}
+import { buildJarvisPayload } from '../execution/jarvis-payload-builder'
 
 
 export interface ClassifyResult {
@@ -173,43 +29,19 @@ export interface OrchestrateResult {
   sessionId: string
 }
 
-const MODULE_SYSTEM_PROMPTS: Record<string, string> = {
-  jarvis: `Você é Kai, assistente pessoal de IA de Marcelo Rayzen — QA Automation Engineer e desenvolvedor full-stack sênior.
-Execute tarefas locais no PC com precisão. Confirme o que foi feito de forma objetiva e técnica.
-Sem frases de abertura. Português brasileiro. Use inglês apenas para termos técnicos consagrados.`,
-
-  brain: `Você é Kai, assistente pessoal de IA de Marcelo Rayzen — QA Automation Engineer e desenvolvedor full-stack sênior especializado em TypeScript, NestJS, Next.js, automação de testes e IA.
-Responda SEMPRE com base nos documentos e informações encontrados na memória.
-Se os documentos contiverem a resposta, apresente-a diretamente e com confiança — sem ressalvas desnecessárias.
-Para perguntas técnicas, seja preciso e direto como um colega sênior. Sugira melhorias quando relevante.
-Sem frases de abertura. Português brasileiro.`,
-
-  doc: `Você é Kai, assistente pessoal de IA de Marcelo Rayzen — desenvolvedor full-stack sênior.
-Gere documentos técnicos, relatórios e contratos com precisão e estrutura clara.
-Use markdown, listas e seções bem definidas. Confirme o documento gerado com os detalhes principais.
-Português brasileiro.`,
-
-  content: `Você é Kai, assistente pessoal de IA de Marcelo Rayzen — desenvolvedor e criador de conteúdo técnico.
-Crie conteúdo direto, autêntico e com tom profissional mas acessível. Foque em desenvolvimento, IA, automação e carreira em tech.
-Entregue o conteúdo pedido imediatamente sem introduções. Português brasileiro.`,
-
-  system: `Você é Kai, assistente pessoal de IA de Marcelo Rayzen — QA Automation Engineer e desenvolvedor full-stack sênior.
-Responda de forma objetiva e técnica. Não explique o óbvio para quem já conhece a stack.
-Sem frases de abertura. Português brasileiro.`,
+const MODULE_ROLE_SUFFIXES: Record<string, string> = {
+  jarvis:  '\n\nContexto desta resposta: executei uma tarefa local no PC. Confirme o resultado de forma objetiva e técnica.',
+  brain:   '\n\nContexto desta resposta: baseie-se nos documentos e informações da memória semântica. Apresente com confiança — sem ressalvas desnecessárias.',
+  doc:     '\n\nContexto desta resposta: geração de documentos técnicos. Use markdown estruturado, listas e seções bem definidas.',
+  content: '\n\nContexto desta resposta: criação de conteúdo. Entregue imediatamente, sem introdução.',
 }
-
-const DEFAULT_SYSTEM_PROMPT = `Você é Kai, assistente pessoal de IA de Marcelo Rayzen — QA Automation Engineer e desenvolvedor full-stack sênior com expertise em TypeScript, NestJS, Next.js, Docker, CI/CD, automação de testes e IA.
-Seja direto, técnico e objetivo. Não explique conceitos básicos desnecessariamente.
-Para código: mostre a solução sem rodeios. Para decisões técnicas: apresente trade-offs concretos.
-Sem frases de abertura como "Olá", "Claro" ou "Estou aqui para ajudar".
-Português brasileiro. Use inglês apenas para termos técnicos consagrados.`
 
 @Injectable()
 export class OrchestratorService {
   private llm: OpenAI
-  private prisma: PrismaClient
 
   constructor(
+    private readonly prisma: PrismaService,
     private config: ConfigService,
     private memory: MemoryService,
     private documentProcessing: DocumentProcessingService,
@@ -223,7 +55,6 @@ export class OrchestratorService {
       baseURL: this.config.get('LITELLM_BASE_URL', 'http://localhost:4000/v1'),
       apiKey: this.config.get('LITELLM_MASTER_KEY'),
     })
-    this.prisma = new PrismaClient()
   }
 
   private getRayzenConfig() {
@@ -232,24 +63,51 @@ export class OrchestratorService {
 
   private getSystemPrompt(module: string): string {
     const cfg = this.getRayzenConfig()
-    const name = cfg?.identity.name ?? 'Rayzen'
-    const personality = cfg?.identity.personality ?? 'Seja direto e objetivo.'
-    const lang = cfg?.identity.language ?? 'pt-BR'
-    const langLabel = lang === 'pt-BR' ? 'Português brasileiro' : lang
+    const base = cfg?.identity.personality ?? 'Seja direto e objetivo. Sem frases de abertura. Português brasileiro.'
+    const suffix = MODULE_ROLE_SUFFIXES[module] ?? ''
+    return base + suffix
+  }
 
-    const roles: Record<string, string> = {
-      jarvis:  'Execute tarefas locais no PC do usuário. Confirme o que foi feito de forma objetiva.',
-      brain:   'Você tem memória semântica. Responda com base nos documentos encontrados.',
-      doc:     'Especializado em documentos. Confirme o documento gerado com os detalhes principais.',
-      content: 'Para criação de conteúdo. Entregue o conteúdo pedido imediatamente.',
-      system:  'Responda de forma objetiva e útil.',
-    }
-
-    return `Você é ${name}. ${personality}\n${roles[module] ?? ''}\nIdioma: ${langLabel}.`
+  async isPendingDocConfirmation(prompt: string, sessionId: string): Promise<boolean> {
+    const CONFIRM_WORDS = /^(confirmar|confirma|sim|ok|pode|pode gerar|gera|gerar|yes|generate)$/i
+    if (!CONFIRM_WORDS.test(prompt.trim())) return false
+    const lastMsg = await this.prisma.conversationMessage.findFirst({
+      where: { sessionId, role: 'assistant' },
+      orderBy: { createdAt: 'desc' },
+    })
+    return !!lastMsg?.content?.includes('[DOC_PENDING:')
   }
 
   async handleMessage(prompt: string, sessionId: string, projectId?: string, workMode?: string): Promise<OrchestrateResult> {
-    // 0. Validar prompt antes de qualquer processamento
+    // 0. Check for pending doc confirmation before anything else
+    const CONFIRM_WORDS = /^(confirmar|confirma|sim|ok|pode|pode gerar|gera|gerar|yes|generate)$/i
+    if (CONFIRM_WORDS.test(prompt.trim())) {
+      const lastMsg = await this.prisma.conversationMessage.findFirst({
+        where: { sessionId, role: 'assistant' },
+        orderBy: { createdAt: 'desc' },
+      })
+      const pendingMatch = lastMsg?.content?.match(/\[DOC_PENDING:([A-Za-z0-9+/=]+)\]/)
+      if (pendingMatch) {
+        const pendingPrompt = Buffer.from(pendingMatch[1], 'base64').toString('utf-8')
+        try {
+          const result = await this.documentProcessing.generatePDF(pendingPrompt, sessionId)
+          const downloadPath = `/documents/download/${result.fileName}`
+          const reply = `Documento gerado: **${result.fileName}** (${Math.round(result.sizeBytes / 1024)}KB)\n\n[⬇ Baixar PDF](${downloadPath})`
+          await this.prisma.conversationMessage.createMany({
+            data: [
+              { sessionId, module: 'doc', role: 'user', content: prompt, projectId, workMode: workMode ?? null },
+              { sessionId, module: 'doc', role: 'assistant', content: reply, tokensUsed: 0, projectId, workMode: workMode ?? null },
+            ],
+          })
+          return { reply, module: 'doc', action: 'generate', confidence: 1.0, tokensUsed: 0, sessionId }
+        } catch (err) {
+          const errReply = `Erro ao gerar documento: ${(err as Error).message}`
+          return { reply: errReply, module: 'doc', action: 'generate', confidence: 1.0, tokensUsed: 0, sessionId }
+        }
+      }
+    }
+
+    // 1. Validar prompt antes de qualquer processamento
     this.validation.assertValidPrompt(prompt)
 
     // 1. Classificar intent
@@ -318,6 +176,20 @@ Seja direto, claro e amigável. Português brasileiro. Sem JSON bruto.`,
     // 4. Rotear para Content se necessário
     if (classify.module === 'content') {
       try {
+        const isDiagram = classify.action === 'diagram' || /diagrama|mermaid|fluxo|flowchart|sequence diagram|arquitetura visual/i.test(prompt)
+        if (isDiagram) {
+          const result = await this.contentEngine.generateDiagram(prompt, sessionId)
+          const reply = `**Diagrama (${result.type})**\n\n\`\`\`mermaid\n${result.diagram}\n\`\`\``
+          return {
+            reply,
+            module: classify.module,
+            action: 'diagram',
+            confidence: classify.confidence,
+            tokensUsed: result.tokensUsed,
+            sessionId,
+          }
+        }
+
         const isCalendar = classify.action === 'calendar' || prompt.toLowerCase().includes('calendário')
         if (isCalendar) {
           const result = await this.contentEngine.generateCalendar(prompt, 7, sessionId)
@@ -349,20 +221,24 @@ Seja direto, claro e amigável. Português brasileiro. Sem JSON bruto.`,
       }
     }
 
-    // 5. Rotear para Doc se necessário
+    // 5. Rotear para Doc se necessário — pede confirmação antes de gerar
     if (classify.module === 'doc') {
-      try {
-        const result = await this.documentProcessing.generatePDF(prompt, sessionId)
-        return {
-          reply: `Documento gerado com sucesso: **${result.fileName}** (${Math.round(result.sizeBytes / 1024)}KB). Acesse via POST /documents/pdf para baixar.`,
-          module: classify.module,
-          action: classify.action,
-          confidence: classify.confidence,
-          tokensUsed: 0,
-          sessionId,
-        }
-      } catch {
-        // Fallback para chat normal
+      const tema = prompt.length > 100 ? prompt.slice(0, 100) + '…' : prompt
+      const encoded = Buffer.from(prompt).toString('base64')
+      const previewReply = `Vou gerar um documento sobre: **${tema}**\n\nResponda **confirmar** para prosseguir, ou detalhe o que precisa diferente.\n\n[DOC_PENDING:${encoded}]`
+      await this.prisma.conversationMessage.createMany({
+        data: [
+          { sessionId, module: 'doc', role: 'user', content: prompt, projectId, workMode: workMode ?? null },
+          { sessionId, module: 'doc', role: 'assistant', content: previewReply, tokensUsed: 0, projectId, workMode: workMode ?? null },
+        ],
+      })
+      return {
+        reply: previewReply,
+        module: classify.module,
+        action: classify.action,
+        confidence: classify.confidence,
+        tokensUsed: 0,
+        sessionId,
       }
     }
 
@@ -379,7 +255,7 @@ Seja direto, claro e amigável. Português brasileiro. Sem JSON bruto.`,
     }))
 
     // 3. Gerar resposta com contexto do módulo + work mode
-    const basePrompt = MODULE_SYSTEM_PROMPTS[classify.module] ?? DEFAULT_SYSTEM_PROMPT
+    const basePrompt = this.getSystemPrompt(classify.module)
     const modeConfig = getWorkModeConfig(workMode)
     const systemPrompt = modeConfig ? basePrompt + modeConfig.systemPromptSuffix : basePrompt
     const messages: ChatMessage[] = [...historyMessages, { role: 'user', content: prompt }]
@@ -435,10 +311,10 @@ Módulos disponíveis:
 - brain: memória e busca — indexar, pesquisar, resumir notas e documentos
 - system: perguntas sobre o assistente, saudações, o que você pode fazer
 
-Ações do jarvis disponíveis: open_app, open_url, open_vscode, create_project_folder, list_dir, file_search, organize_downloads, get_system_info, screenshot, notify, clipboard_read, clipboard_write, git_status, git_log, git_branch, git_commit, run_command, docker_ps, docker_start, docker_stop, read_emails, send_email, get_calendar
-Ações do content disponíveis: post, thread, article, calendar
-Exemplos jarvis: "qual o status do PC", "abra o chrome", "liste os downloads", "coloca música no youtube", "leia meus emails", "manda email para X", "abre o vscode", "crie projeto meu-app nextjs", "tira um screenshot", "me notifica daqui 10 min", "lê minha área de transferência", "git status do projeto X", "quais commits recentes", "cria branch feature/Y", "roda os testes do projeto X", "lista containers docker", "para o container redis", "minha agenda de hoje", "procura arquivo relatorio.pdf"
-Exemplos content: "crie um post sobre X", "escreva uma thread sobre Y", "faça um artigo sobre Z", "crie um calendário editorial"
+Ações do jarvis disponíveis: open_app, open_url, open_vscode, create_project_folder, list_dir, file_search, organize_downloads, get_system_info, screenshot, notify, clipboard_read, clipboard_write, git_status, git_log, git_branch, git_commit, run_command, run_tests, inspect_schema, docker_ps, docker_start, docker_stop, read_emails, send_email, get_calendar
+Ações do content disponíveis: post, thread, article, calendar, diagram
+Exemplos jarvis: "qual o status do PC", "abra o chrome", "liste os downloads", "coloca música no youtube", "leia meus emails", "manda email para X", "abre o vscode", "crie projeto meu-app nextjs", "tira um screenshot", "me notifica daqui 10 min", "lê minha área de transferência", "git status do projeto X", "quais commits recentes", "cria branch feature/Y", "roda os testes do projeto X", "lista containers docker", "para o container redis", "minha agenda de hoje", "procura arquivo relatorio.pdf", "mostra o schema do banco", "inspeciona o schema prisma"
+Exemplos content: "crie um post sobre X", "escreva uma thread sobre Y", "faça um artigo sobre Z", "crie um calendário editorial", "gere um diagrama da arquitetura", "desenhe o fluxo entre API e Agent", "crie um sequence diagram do chat"
 Exemplos brain: "qual minha profissão?", "o que você sabe sobre mim?", "qual meu nome?", "o que eu te disse sobre X?", "me fale sobre meus projetos"
 Exemplos system: "quem é você", "o que você pode fazer", "olá", "como você funciona", "meu nome é X", "trabalho como Y", "sou Z", "me chamo X", afirmações e apresentações pessoais do usuário
 

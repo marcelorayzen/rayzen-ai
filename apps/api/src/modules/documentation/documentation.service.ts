@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
-import { PrismaClient } from '@prisma/client'
+import { PrismaService } from '../../prisma/prisma.service'
 import OpenAI from 'openai'
 
 export type DocType = 'project_state' | 'decisions_log' | 'next_actions' | 'work_journal'
@@ -58,10 +58,9 @@ function computeDiff(oldText: string, newText: string): string {
 
 @Injectable()
 export class DocumentationService {
-  private prisma = new PrismaClient()
   private llm: OpenAI
 
-  constructor(private config: ConfigService) {
+  constructor(private readonly prisma: PrismaService, private config: ConfigService) {
     this.llm = new OpenAI({
       baseURL: this.config.get('LITELLM_BASE_URL', 'http://localhost:4000/v1'),
       apiKey: this.config.get('LITELLM_MASTER_KEY'),

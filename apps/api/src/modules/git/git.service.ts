@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common'
-import { PrismaClient } from '@prisma/client'
+import { PrismaService } from '../../prisma/prisma.service'
 
 export interface GitEventPayload {
   // GitHub webhook (push)
@@ -38,7 +38,7 @@ export interface GitContext {
 
 @Injectable()
 export class GitService {
-  private prisma = new PrismaClient()
+  constructor(private readonly prisma: PrismaService) {}
 
   async fromWebhook(payload: GitEventPayload, projectId?: string): Promise<{ saved: number }> {
     const pid = projectId ?? payload.projectId ?? null

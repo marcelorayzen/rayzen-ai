@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common'
 import { ConfigModule } from '@nestjs/config'
+import { PrismaModule } from './prisma/prisma.module'
 import { BullModule } from '@nestjs/bull'
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler'
 import { APP_GUARD } from '@nestjs/core'
@@ -23,10 +24,12 @@ import { ProjectStateModule } from './modules/project-state/project-state.module
 import { GitModule } from './modules/git/git.module'
 import { ProactiveModule } from './modules/proactive/proactive.module'
 import { HealthModule } from './modules/health/health.module'
+import { NotionModule } from './modules/notion/notion.module'
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    PrismaModule,
     BullModule.forRoot({ redis: process.env.REDIS_URL }),
     ThrottlerModule.forRoot([{ ttl: 60000, limit: 120 }]),
     AuthModule,
@@ -49,6 +52,7 @@ import { HealthModule } from './modules/health/health.module'
     GitModule,
     ProactiveModule,
     HealthModule,
+    NotionModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })

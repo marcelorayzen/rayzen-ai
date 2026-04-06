@@ -1,5 +1,5 @@
 import { Controller, Post, Body } from '@nestjs/common'
-import { ApiTags } from '@nestjs/swagger'
+import { ApiTags, ApiOperation } from '@nestjs/swagger'
 import { ContentEngineService, ContentType, ContentTone } from './content-engine.service'
 import { IsString, IsOptional, IsIn, IsNumber, Min, Max } from 'class-validator'
 import { randomUUID } from 'crypto'
@@ -18,6 +18,15 @@ class GenerateContentDto {
   @IsOptional()
   @IsString()
   context?: string
+
+  @IsOptional()
+  @IsString()
+  sessionId?: string
+}
+
+class GenerateDiagramDto {
+  @IsString()
+  description!: string
 
   @IsOptional()
   @IsString()
@@ -62,5 +71,11 @@ export class ContentEngineController {
       dto.days ?? 7,
       dto.sessionId ?? randomUUID(),
     )
+  }
+
+  @Post('diagram')
+  @ApiOperation({ summary: 'Gerar diagrama Mermaid a partir de descrição textual' })
+  diagram(@Body() dto: GenerateDiagramDto) {
+    return this.svc.generateDiagram(dto.description, dto.sessionId ?? randomUUID())
   }
 }

@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common'
-import { PrismaClient } from '@prisma/client'
+import { PrismaService } from '../../prisma/prisma.service'
 
 export type EventSource = 'chat' | 'memory' | 'cli' | 'voice' | 'execution' | 'manual'
 export type EventType = 'message' | 'index' | 'execution' | 'decision' | 'note' | 'error'
@@ -24,7 +24,7 @@ function deriveMemoryClass(intent?: EventIntent | null): MemoryClass {
 
 @Injectable()
 export class EventService {
-  private prisma = new PrismaClient()
+  constructor(private readonly prisma: PrismaService) {}
 
   async create(dto: CreateEventDto) {
     const memoryClass = deriveMemoryClass(dto.intent)

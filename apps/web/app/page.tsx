@@ -198,6 +198,10 @@ export default function Home() {
   const [healthOpen, setHealthOpen] = useState(false)
   const [healthData, setHealthData] = useState<HealthData | null>(null)
   const [workMode, setWorkMode] = useState<WorkMode | null>(null)
+  const [newProjectOpen, setNewProjectOpen] = useState(false)
+  const [newProjectName, setNewProjectName] = useState('')
+  const [newProjectDesc, setNewProjectDesc] = useState('')
+  const [creatingProject, setCreatingProject] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
   const [importTab, setImportTab] = useState<ImportTab>('github')
   const [importLoading, setImportLoading] = useState(false)
@@ -436,6 +440,27 @@ export default function Home() {
       if (res.ok) setHealthData(await res.json() as HealthData)
     } catch { /* silencioso */ }
   }, [])
+
+  const createProject = useCallback(async () => {
+    if (!newProjectName.trim()) return
+    setCreatingProject(true)
+    try {
+      const res = await fetch(`${API_URL}/projects`, {
+        method: 'POST',
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ name: newProjectName.trim(), description: newProjectDesc.trim() || undefined }),
+      })
+      if (res.ok) {
+        const project = await res.json() as Project
+        setProjects(prev => [...prev, project])
+        setActiveProjectId(project.id)
+        setNewProjectOpen(false)
+        setNewProjectName('')
+        setNewProjectDesc('')
+      }
+    } catch { /* silencioso */ }
+    finally { setCreatingProject(false) }
+  }, [newProjectName, newProjectDesc])
 
   useEffect(() => {
     if (activeProjectId) {
@@ -865,6 +890,48 @@ export default function Home() {
                   )}
                 </div>
               ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* New project modal */}
+      {newProjectOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="fixed inset-0 bg-black/70" onClick={() => { setNewProjectOpen(false); setNewProjectName(''); setNewProjectDesc('') }} />
+          <div className="relative z-50 w-full max-w-sm bg-zinc-900 border border-zinc-800 rounded-2xl p-5 mx-4">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-sm font-semibold">Novo projeto</h2>
+              <button onClick={() => { setNewProjectOpen(false); setNewProjectName(''); setNewProjectDesc('') }} className="text-zinc-500 hover:text-zinc-300 text-xl leading-none">×</button>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs text-zinc-500 mb-1 block">Nome *</label>
+                <input
+                  value={newProjectName}
+                  onChange={(e) => setNewProjectName(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') createProject() }}
+                  placeholder="ex: rayzen-ai-teste"
+                  autoFocus
+                  className="w-full bg-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 outline-none focus:ring-1 focus:ring-zinc-600"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-zinc-500 mb-1 block">Descrição (opcional)</label>
+                <input
+                  value={newProjectDesc}
+                  onChange={(e) => setNewProjectDesc(e.target.value)}
+                  placeholder="ex: plataforma de testes de IA"
+                  className="w-full bg-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 outline-none focus:ring-1 focus:ring-zinc-600"
+                />
+              </div>
+              <button
+                onClick={createProject}
+                disabled={creatingProject || !newProjectName.trim()}
+                className="w-full bg-zinc-100 text-zinc-900 rounded-lg py-2 text-sm font-medium disabled:opacity-40 hover:bg-white transition-colors"
+              >
+                {creatingProject ? 'Criando…' : 'Criar projeto'}
+              </button>
             </div>
           </div>
         </div>
@@ -1719,7 +1786,7 @@ export default function Home() {
           </div>
         </div>
         <div className="flex items-center gap-3">
-          {projects.length > 0 && (
+          <div className="flex items-center gap-1">
             <select
               value={activeProjectId ?? ''}
               onChange={(e) => setActiveProjectId(e.target.value || null)}
@@ -1730,7 +1797,12 @@ export default function Home() {
                 <option key={p.id} value={p.id}>{p.name}</option>
               ))}
             </select>
-          )}
+            <button
+              onClick={() => setNewProjectOpen(true)}
+              className="text-zinc-500 hover:text-zinc-200 transition-colors w-6 h-6 flex items-center justify-center rounded-md hover:bg-zinc-700 text-base leading-none"
+              title="Novo projeto"
+            >+</button>
+          </div>
           {activeProjectId && (
             <select
               value={workMode ?? ''}
@@ -1873,7 +1945,21 @@ export default function Home() {
             >
               {msg.role === 'assistant' ? (
                 <div className="prose prose-invert prose-sm max-w-none">
-                  <ReactMarkdown>{msg.content}</ReactMarkdown>
+                  <ReactMarkdown
+                    components={{
+                      a: ({ href, children }: { href?: string; children?: React.ReactNode }) => {
+                        const url = href?.startsWith('/') ? `${API_URL}${href}` : (href ?? '#')
+                        const isDownload = href?.startsWith('/documents/download/') ?? false
+                        return (
+                          <a href={url} target="_blank" rel="noopener noreferrer" download={isDownload || undefined} className="text-indigo-400 underline hover:text-indigo-300">
+                            {children}
+                          </a>
+                        )
+                      },
+                    }}
+                  >
+                    {msg.content.replace(/\n?\[DOC_PENDING:[A-Za-z0-9+/=]*\]/g, '').trim()}
+                  </ReactMarkdown>
                 </div>
               ) : (
                 msg.content

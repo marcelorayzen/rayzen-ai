@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
-import { PrismaClient } from '@prisma/client'
+import { PrismaService } from '../../prisma/prisma.service'
 import OpenAI from 'openai'
 import { HealthScoreService } from '../health/health.service'
 import { EventService } from '../event/event.service'
@@ -34,10 +34,10 @@ export interface ProjectStateData {
 
 @Injectable()
 export class ProjectStateService {
-  private prisma = new PrismaClient()
   private llm: OpenAI
 
   constructor(
+    private readonly prisma: PrismaService,
     private config: ConfigService,
     private healthScore: HealthScoreService,
     private eventService: EventService,

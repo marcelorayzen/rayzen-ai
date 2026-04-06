@@ -1,5 +1,5 @@
 import { Injectable, BadRequestException } from '@nestjs/common'
-import { PrismaClient } from '@prisma/client'
+import { PrismaService } from '../../prisma/prisma.service'
 import { readFile, writeFile, mkdir, stat } from 'fs/promises'
 import { existsSync } from 'fs'
 import { join } from 'path'
@@ -34,9 +34,8 @@ interface ConflictFile {
 
 @Injectable()
 export class ObsidianService {
-  private prisma = new PrismaClient()
 
-  constructor(private rayzenConfig: RayzenConfigService) {}
+  constructor(private readonly prisma: PrismaService, private rayzenConfig: RayzenConfigService) {}
 
   async sync(projectId: string, force = false): Promise<SyncResult> {
     const cfg = this.rayzenConfig.getConfig()

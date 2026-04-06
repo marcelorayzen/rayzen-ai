@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
-import { PrismaClient } from '@prisma/client'
+import { PrismaService } from '../../prisma/prisma.service'
 import OpenAI from 'openai'
 import { createHash } from 'crypto'
 import { EventService } from '../event/event.service'
@@ -28,14 +28,11 @@ export interface SearchSynthesis {
 
 @Injectable()
 export class MemoryService {
-  private prisma: PrismaClient
-
   constructor(
+    private readonly prisma: PrismaService,
     private config: ConfigService,
     private eventService: EventService,
-  ) {
-    this.prisma = new PrismaClient()
-  }
+  ) {}
 
   private async embed(text: string): Promise<number[]> {
     const res = await fetch('https://api.jina.ai/v1/embeddings', {

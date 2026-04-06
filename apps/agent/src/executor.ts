@@ -13,6 +13,8 @@ import { notify } from './actions/notify'
 import { clipboardRead, clipboardWrite } from './actions/clipboard'
 import { gitStatus, gitLog, gitBranch, gitCommit } from './actions/git'
 import { runCommand } from './actions/terminal'
+import { runTests } from './actions/run-tests'
+import { inspectSchema } from './actions/inspect-schema'
 import { dockerPs, dockerStart, dockerStop } from './actions/docker'
 import { readEmails, sendEmail } from './actions/outlook'
 import { getCalendar } from './actions/outlook-calendar'
@@ -52,7 +54,9 @@ export async function executeTask(task: Task): Promise<unknown> {
     case 'jarvis:git_commit':  return gitCommit(p as { path: string; message: string; dryRun?: boolean })
 
     // Terminal
-    case 'jarvis:run_command': return runCommand(p as { command: string; path?: string })
+    case 'jarvis:run_command':    return runCommand(p as { command: string; path?: string })
+    case 'jarvis:run_tests':      return runTests(p as { projectPath?: string; runner?: 'jest' | 'vitest' | 'playwright'; coverage?: boolean; filter?: string })
+    case 'jarvis:inspect_schema': return inspectSchema(p as { projectPath?: string })
 
     // Docker
     case 'jarvis:docker_ps':    return dockerPs()

@@ -1,6 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing'
 import { ConfigService } from '@nestjs/config'
 import { MemoryService } from '../memory.service'
+import { PrismaService } from '../../../prisma/prisma.service'
+import { EventService } from '../../event/event.service'
 
 const mockPrisma = {
   document: {
@@ -14,10 +16,6 @@ const mockPrisma = {
   $executeRaw: jest.fn(),
   $queryRaw: jest.fn(),
 }
-
-jest.mock('@prisma/client', () => ({
-  PrismaClient: jest.fn().mockImplementation(() => mockPrisma),
-}))
 
 const mockConfigGet = jest.fn().mockReturnValue('mock-key')
 
@@ -37,7 +35,9 @@ describe('MemoryService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         MemoryService,
+        { provide: PrismaService, useValue: mockPrisma },
         { provide: ConfigService, useValue: { get: mockConfigGet } },
+        { provide: EventService, useValue: { emit: jest.fn() } },
       ],
     }).compile()
 

@@ -2,7 +2,7 @@ import { Controller, Get, Post, Patch, Body, Query, Param } from '@nestjs/common
 import { ApiTags, ApiOperation } from '@nestjs/swagger'
 import { EventService, CreateEventDto, MemoryClass } from './event.service'
 import { SynthesisService } from '../synthesis/synthesis.service'
-import { PrismaClient } from '@prisma/client'
+import { PrismaService } from '../../prisma/prisma.service'
 
 interface GitContext {
   branch?: string
@@ -27,9 +27,9 @@ interface CliHookPayload {
 @ApiTags('events')
 @Controller('events')
 export class EventController {
-  private prisma = new PrismaClient()
 
   constructor(
+    private readonly prisma: PrismaService,
     private readonly events: EventService,
     private readonly synthesis: SynthesisService,
   ) {}

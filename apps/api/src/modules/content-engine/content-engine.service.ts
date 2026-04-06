@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
-import { PrismaClient } from '@prisma/client'
+import { PrismaService } from '../../prisma/prisma.service'
 import OpenAI from 'openai'
 
-export type ContentType = 'post' | 'thread' | 'article' | 'calendar'
+export type ContentType = 'post' | 'thread' | 'article' | 'calendar' | 'diagram'
 export type ContentTone = 'professional' | 'casual' | 'educational' | 'persuasive' | 'creative'
 
 export interface ContentResult {
@@ -25,6 +25,12 @@ export interface CalendarResult {
   tokensUsed: number
 }
 
+export interface DiagramResult {
+  diagram: string
+  type: string
+  tokensUsed: number
+}
+
 const TYPE_PROMPTS: Record<ContentType, string> = {
   post: `Crie um post para LinkedIn ou Instagram.
 Estrutura: gancho forte (1ª linha), desenvolvimento (3-5 parágrafos curtos), CTA no final.
@@ -39,15 +45,14 @@ Estrutura: título SEO, introdução, 3-5 seções com subtítulos H2, conclusã
 Tom informativo e aprofundado. Entre 600-1000 palavras.`,
 
   calendar: `Crie um calendário editorial.`,
+  diagram: `Gere um diagrama Mermaid.`,
 }
 
 @Injectable()
 export class ContentEngineService {
-  private prisma: PrismaClient
   private llm: OpenAI
 
-  constructor(private config: ConfigService) {
-    this.prisma = new PrismaClient()
+  constructor(private readonly prisma: PrismaService, private config: ConfigService) {
     this.llm = new OpenAI({
       baseURL: this.config.get('LITELLM_BASE_URL', 'http://localhost:4000/v1'),
       apiKey: this.config.get('LITELLM_MASTER_KEY'),
@@ -141,5 +146,47 @@ Sem markdown, sem explicações. Apenas o JSON.`,
       entries: parsed.entries as CalendarEntry[],
       tokensUsed,
     }
+  }
+
+  async generateDiagram(description: string, sessionId: string): Promise<DiagramResult> {
+    const diagramType = this.inferDiagramType(description)
+
+    const res = await this.llm.chat.completions.create({
+      model: 'gpt-4o',
+      messages: [
+        {
+          role: 'system',
+          content: `Você é um especialista em diagramas Mermaid.
+Gere APENAS o código Mermaid válido, sem markdown fences (\`\`\`), sem explicações.
+Tipos disponíveis: flowchart, sequenceDiagram, classDiagram, erDiagram, gantt, gitGraph, mindmap.
+Use o tipo mais adequado para a descrição. Prefira flowchart LR para arquitetura e fluxos.`,
+        },
+        { role: 'user', content: description },
+      ],
+      temperature: 0.2,
+    })
+
+    const diagram = res.choices[0].message.content?.trim() ?? ''
+    const tokensUsed = res.usage?.total_tokens ?? 0
+
+    await this.prisma.conversationMessage.createMany({
+      data: [
+        { sessionId, module: 'content', role: 'user', content: `diagrama: ${description}` },
+        { sessionId, module: 'content', role: 'assistant', content: diagram, tokensUsed },
+      ],
+    })
+
+    return { diagram, type: diagramType, tokensUsed }
+  }
+
+  private inferDiagramType(description: string): string {
+    const lower = description.toLowerCase()
+    if (lower.includes('sequência') || lower.includes('sequence') || lower.includes('fluxo de chamada')) return 'sequenceDiagram'
+    if (lower.includes('classe') || lower.includes('class')) return 'classDiagram'
+    if (lower.includes('er ') || lower.includes('entidade') || lower.includes('banco')) return 'erDiagram'
+    if (lower.includes('gantt') || lower.includes('cronograma') || lower.includes('timeline')) return 'gantt'
+    if (lower.includes('git') || lower.includes('branch')) return 'gitGraph'
+    if (lower.includes('mente') || lower.includes('mind') || lower.includes('mapa mental')) return 'mindmap'
+    return 'flowchart'
   }
 }

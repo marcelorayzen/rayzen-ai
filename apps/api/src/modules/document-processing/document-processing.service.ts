@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
-import { PrismaClient } from '@prisma/client'
+import { PrismaService } from '../../prisma/prisma.service'
 import OpenAI from 'openai'
 import * as puppeteer from 'puppeteer'
 import * as fs from 'fs'
@@ -24,12 +24,10 @@ Língua: português brasileiro.`
 
 @Injectable()
 export class DocumentProcessingService {
-  private prisma: PrismaClient
   private llm: OpenAI
   private outputDir: string
 
-  constructor(private config: ConfigService) {
-    this.prisma = new PrismaClient()
+  constructor(private readonly prisma: PrismaService, private config: ConfigService) {
     this.llm = new OpenAI({
       baseURL: this.config.get('LITELLM_BASE_URL', 'http://localhost:4000/v1'),
       apiKey: this.config.get('LITELLM_MASTER_KEY'),
@@ -38,6 +36,10 @@ export class DocumentProcessingService {
     if (!fs.existsSync(this.outputDir)) {
       fs.mkdirSync(this.outputDir, { recursive: true })
     }
+  }
+
+  getOutputDir(): string {
+    return this.outputDir
   }
 
   async generatePDF(prompt: string, sessionId: string): Promise<GenerateDocResult> {

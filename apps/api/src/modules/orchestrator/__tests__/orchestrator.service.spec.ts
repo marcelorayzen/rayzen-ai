@@ -7,6 +7,8 @@ import { ExecutionService } from '../../execution/execution.service'
 import { ContentEngineService } from '../../content-engine/content-engine.service'
 import { RayzenConfigService } from '../../configuration/configuration.service'
 import { ValidationService } from '../../validation/validation.service'
+import { PrismaService } from '../../../prisma/prisma.service'
+import { EventService } from '../../event/event.service'
 
 const mockLLM = {
   chat: {
@@ -27,10 +29,6 @@ const mockPrisma = {
     createMany: jest.fn().mockResolvedValue({}),
   },
 }
-
-jest.mock('@prisma/client', () => ({
-  PrismaClient: jest.fn().mockImplementation(() => mockPrisma),
-}))
 
 describe('OrchestratorService', () => {
   let service: OrchestratorService
@@ -82,6 +80,8 @@ describe('OrchestratorService', () => {
             validateClassification: jest.fn().mockReturnValue({ valid: true, issues: [], score: 1 }),
           },
         },
+        { provide: PrismaService, useValue: mockPrisma },
+        { provide: EventService, useValue: { emit: jest.fn() } },
       ],
     }).compile()
 
