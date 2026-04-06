@@ -200,16 +200,134 @@ Cada fase tem escopo mínimo e critério de done explícito. Nada avança sem o 
 
 ---
 
+## Fase 11 — Planejamento operacional
+
+**Objetivo:** o Rayzen passa de "onde estou" para "onde preciso chegar e o que está entre mim e lá". Fecha o loop entre memória e ação.
+
+**Por que agora:** com estado estruturado (Fase 7) e inteligência proativa (Fase 10) funcionando, a lacuna evidente é que o sistema observa e sugere, mas não mantém um plano coerente e executável.
+
+**Decisão de design:** não criar uma entidade `project_plan` separada — estender `ProjectState` com os campos de planejamento. Evita modelo duplicado e mantém uma única fonte de verdade sobre o projeto.
+
+### O que implementar
+
+- [ ] Estender `ProjectState` com: `milestones[]` (com status `pending|active|done`), `backlog[]` (itens ordenados por prioridade), `activeFocus` (o que está sendo trabalhado agora), `definitionOfDone` (critério de aceite do milestone atual)
+- [ ] Heurística de promoção automática: blocker presente em 3+ refreshes do estado → sobe para `activeFocus`
+- [ ] `POST /projects/:id/resume` — assistente de retomada: dado projeto inativo >24h, retorna brief estruturado com último estado confiável, mudanças recentes, blockers ativos e próximo melhor passo
+- [ ] UI: painel "agora / depois / bloqueado" como view primária do estado do projeto
+- [ ] UI: botão "Retomar" no header quando projeto inativo >24h → abre resumption brief
+
+### Critério de done
+
+> Abro um projeto após 3 dias sem mexer. Clico em "Retomar" e em 10 segundos vejo: onde parei, o que mudou, o que está bloqueando e qual é o próximo melhor passo. O painel de estado mostra milestones, o que está em foco agora e o backlog em ordem.
+
+---
+
+## Fase 12 — Health score e consistência ampliada
+
+**Objetivo:** formalizar a saúde do projeto em um número contínuo com histórico — permite ver se o projeto está melhorando ou degradando ao longo do tempo.
+
+**Por que agora:** a Fase 10 tem verificações binárias (tem/não tem recomendação). O health score dá leitura gradual, histórica e comparável entre projetos.
+
+**Decisão de design:** score calculado por 6 dimensões com pesos definidos, persistido com timestamp para permitir curva histórica.
+
+### Fórmula do health score (0–100)
+
+| Dimensão | Peso | Critério |
+|---|---|---|
+| Atividade recente | 20% | dias desde último evento: 0d=100, 7d=70, 30d=0 |
+| Documentação em dia | 20% | % de docs regenerados nos últimos 14 dias |
+| Consistência | 20% | resultado do ConsistencyAgent (Fase 10) |
+| Next steps claros | 15% | >0 next_steps com <5 dias de idade |
+| Blockers resolvendo | 15% | blockers diminuíram entre os 2 últimos refreshes de estado |
+| Foco definido | 10% | `activeFocus` preenchido (Fase 11) |
+
+### O que implementar
+
+- [ ] Tabela `project_health_scores`: `id`, `project_id`, `score`, `breakdown` (JSON com as 6 dimensões), `created_at`
+- [ ] `HealthScoreService.compute(project_id)` — calcula e persiste score; roda ao final de cada refresh de estado
+- [ ] Adicionar regra de drift ao `ProactiveService`: compara `project.goals` com eventos e commits recentes — se foco divergiu, emite recomendação tipo `drift`
+- [ ] Endpoint `GET /projects/:id/health` — score atual + histórico dos últimos 30 dias
+- [ ] Ampliar categorias de inconsistência: `warning | inconsistency | missing_evidence | stale_knowledge | orphan_artifact | drift`
+- [ ] UI: badge numérico no header (`⬡ 74`) com cor por faixa (verde ≥70, âmbar 40–69, vermelho <40)
+- [ ] UI: mini-gráfico de curva histórica no painel de estado do projeto
+
+### Critério de done
+
+> O projeto mostra score `⬡ 68`. Clico nele e vejo: documentação em dia (100), atividade (82), mas consistência baixa (40) porque docs descrevem arquitetura antiga. O gráfico mostra que o score caiu 15 pontos na última semana.
+
+---
+
+## Fase 13 — Memória hierárquica
+
+**Objetivo:** separar eventos de alto sinal de ruído de baixo valor — sínteses mais precisas e contexto de chat menos poluído.
+
+**Por que depois de 12:** sem health score e planejamento operacional, não há critério claro para definir o que é "relevante". Com Fase 11 e 12 implementadas, as regras de promoção emergem naturalmente dos dados.
+
+**Decisão de design:** começar simples — campo `memory_class` nos eventos, regras por intent e tempo, sem ML. Decay semântico é fase posterior quando houver dados suficientes.
+
+### O que implementar
+
+- [ ] Campo `memory_class` em `Event`: `inbox | working | consolidated | archive` (default: `inbox`)
+- [ ] Regras de promoção automática:
+  - evento com `intent: 'decision'` → `consolidated`
+  - evento com `intent: 'problem'` + sem resolução em 48h → `working`
+  - evento `inbox` sem referência em 30 dias → `archive`
+- [ ] `SynthesisService` filtra por class: usa `consolidated + working`, ignora `archive` no contexto enviado ao LLM
+- [ ] `DocumentationService` idem: contexto construído a partir de `consolidated` prioritariamente
+- [ ] Endpoint `PATCH /events/:id/class` — promoção/rebaixamento manual
+- [ ] UI: filtro por `memory_class` na timeline de atividade
+
+### Critério de done
+
+> Tenho 500 eventos no projeto. A síntese usa os 80 mais relevantes (consolidated + working). Um evento antigo de "leu arquivo config.ts" está em `archive` e não aparece no contexto. Consigo promover um evento manualmente para `consolidated` com um clique.
+
+---
+
+## Fase 14 — Work modes
+
+**Objetivo:** o Rayzen adapta heurísticas, sínteses e sugestões ao tipo de trabalho da sessão — menos genérico, mais útil.
+
+**Por que por último neste bloco:** modos dependem de síntese de qualidade (Fase 13), planejamento coerente (Fase 11) e saúde confiável (Fase 12) para ser relevante. Sem essas bases, modo é só estética.
+
+**Decisão de design:** `mode` no nível da sessão/checkpoint, não do projeto (você muda de modo dentro do mesmo projeto). Implementação via config de sistema prompt + pesos — sem lógica ramificada nova.
+
+### Modos e seus focos
+
+| Modo | Foco da síntese | Peso elevado | Proativa prioriza |
+|---|---|---|---|
+| `implementation` | commits, arquivos, blockers, plano | git + events | blockers e next steps |
+| `debugging` | erros, tentativas, stack traces, soluções | events de erro | consistência e drift |
+| `architecture` | decisões, trade-offs, estrutura | decisions + docs | docs desatualizados |
+| `study` | conceitos, links, comparações, resumos | captura manual | docs sem referência |
+| `review` | o que mudou, o que divergiu, qualidade | versions + health | inconsistências |
+
+### O que implementar
+
+- [ ] Campo `mode` em `ConversationMessage` e `SessionArtifact`
+- [ ] Objeto de configuração por modo: `systemPromptSuffix`, `eventWeights`, `synthesisFocus`
+- [ ] `OrchestratorService` aplica config do modo ativo na montagem do contexto
+- [ ] `SynthesisService` usa `synthesisFocus` do modo para ajustar o prompt de síntese
+- [ ] Seletor de modo na UI (junto ao seletor de projeto no header)
+- [ ] Modo persiste na sessão — novos eventos são tagged com o modo ativo
+
+### Critério de done
+
+> Seleciono modo `debugging`. Envio uma mensagem sobre um erro. A síntese no encerramento da sessão foca em: o que tentei, o que falhou, o que resolveu, e qual o próximo passo de investigação — sem ruído de decisões arquiteturais ou docs.
+
+---
+
 ## Fases futuras (não agora)
 
 | Fase | O que é | Por que esperar |
 |---|---|---|
 | Deploy VPS Oracle | Colocar em produção | Login Oracle bloqueado — ver docs/deploy.md |
-| Agente de retrospectiva | Resumo diário/semanal automático | Requer Fase 10 estável |
-| Mapa de conhecimento | Cruzar projetos, estudos, padrões | Requer meses de dados |
-| Playbooks pessoais | Detectar padrões de decisão do usuário | Requer Fase 10 + dados históricos |
-| Plugin nativo Obsidian | Plugin que lê o vault e fala com a API | Só após Fase 6 + 8 estáveis |
-| Multi-agent | Agentes especializados por domínio | Primeiro consolida inteligência proativa |
+| Fase 15 — Checkpoints inteligentes | Checkpoint detecta automaticamente o melhor momento para síntese | Requer Fase 14 estável + dados de padrão de uso |
+| Fase 16 — Knowledge graph leve | Relacionar projeto ↔ decisão ↔ doc ↔ arquivo ↔ conceito | Entidades precisam ter semântica estável (Fase 13) |
+| Revisão semanal automática | Rotina: o que avançou, travou, envelheceu, está incoerente | Requer health score (Fase 12) + memória hierárquica (Fase 13) |
+| Biblioteca de decisões | Camada transversal entre projetos: padrões, trade-offs, escolhas recorrentes | Requer múltiplos projetos ativos com dados consolidados |
+| Playbooks pessoais | Detectar padrões de decisão do usuário | Requer Fase 16 + dados históricos extensos |
+| Plugin nativo Obsidian | Plugin que lê o vault e fala com a API | Só após Fase 6 + 8 estáveis e VPS em produção |
+| Multi-agent | Agentes especializados por modo de trabalho | Primeiro consolida work modes (Fase 14) |
 
 ---
 
@@ -227,6 +345,10 @@ Cada fase tem escopo mínimo e critério de done explícito. Nada avança sem o 
 | Fase 8 — Confiança e rastreabilidade | ✅ Concluído |
 | Fase 9 — Git-aware context | ✅ Concluído |
 | Fase 10 — Inteligência proativa | ✅ Concluído |
+| Fase 11 — Planejamento operacional | 🔲 Não iniciado |
+| Fase 12 — Health score | 🔲 Não iniciado |
+| Fase 13 — Memória hierárquica | 🔲 Não iniciado |
+| Fase 14 — Work modes | 🔲 Não iniciado |
 
 ---
 
@@ -238,3 +360,5 @@ Cada fase tem escopo mínimo e critério de done explícito. Nada avança sem o 
 - **Automação é auditável** — tudo que a IA faz sozinha aparece na timeline
 - **Edição humana tem precedência** — IA sugere merge, nunca sobrescreve
 - **Confiança vem de rastreabilidade** — cada artefato tem proveniência clara
+- **Simples antes de inteligente** — regras explícitas antes de ML; semântica antes de grafo
+- **Execução fecha o loop** — memória sem plano é arquivo; plano sem execução é wishlist
