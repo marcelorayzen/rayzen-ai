@@ -81,7 +81,32 @@ interface ProjectState {
   risks: string[]
   docGaps: string[]
   riskLevel: 'low' | 'medium' | 'high'
+  milestones: Array<{ id: string; title: string; status: 'pending' | 'active' | 'done' }>
+  backlog: Array<{ id: string; title: string; priority: 'high' | 'medium' | 'low' }>
+  activeFocus: string
+  definitionOfDone: string
   updatedAt: string
+}
+
+interface HealthBreakdown {
+  activity: number
+  documentation: number
+  consistency: number
+  nextSteps: number
+  blockers: number
+  focus: number
+}
+
+interface HealthScore {
+  id: string
+  score: number
+  breakdown: HealthBreakdown
+  createdAt: string
+}
+
+interface HealthData {
+  current: HealthScore | null
+  history: HealthScore[]
 }
 
 interface GitContext {
@@ -166,6 +191,8 @@ export default function Home() {
   const [quickCaptureIntent, setQuickCaptureIntent] = useState<QuickCaptureIntent>('idea')
   const [quickCaptureText, setQuickCaptureText] = useState('')
   const [quickCaptureSaving, setQuickCaptureSaving] = useState(false)
+  const [healthOpen, setHealthOpen] = useState(false)
+  const [healthData, setHealthData] = useState<HealthData | null>(null)
   const [importOpen, setImportOpen] = useState(false)
   const [importTab, setImportTab] = useState<ImportTab>('github')
   const [importLoading, setImportLoading] = useState(false)
@@ -208,12 +235,14 @@ export default function Home() {
       loadProjectState(activeProjectId)
       loadGitContext(activeProjectId)
       loadRecommendations(activeProjectId)
+      loadHealth(activeProjectId)
     } else {
       setProjectState(null)
       setGitContext(null)
       setRecommendations([])
+      setHealthData(null)
     }
-  }, [activeProjectId, loadProjectState, loadGitContext, loadRecommendations])
+  }, [activeProjectId, loadProjectState, loadGitContext, loadRecommendations, loadHealth])
 
   useEffect(() => {
     setSessionId(crypto.randomUUID())
@@ -402,6 +431,13 @@ export default function Home() {
         const data = await res.json() as Recommendation[]
         setRecommendations(data.filter(r => r.type !== 'all_clear'))
       }
+    } catch { /* silencioso */ }
+  }, [])
+
+  const loadHealth = useCallback(async (projectId: string) => {
+    try {
+      const res = await fetch(`${API_URL}/projects/${projectId}/health`, { headers: authHeaders() })
+      if (res.ok) setHealthData(await res.json() as HealthData)
     } catch { /* silencioso */ }
   }, [])
 
@@ -824,6 +860,87 @@ export default function Home() {
         </div>
       )}
 
+      {/* Health score modal */}
+      {healthOpen && healthData && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="fixed inset-0 bg-black/70" onClick={() => setHealthOpen(false)} />
+          <div className="relative z-50 w-full max-w-md bg-zinc-900 border border-zinc-800 rounded-2xl mx-4 max-h-[85vh] flex flex-col">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-800">
+              <div className="flex items-center gap-3">
+                <span className={`text-2xl font-bold font-mono ${
+                  (healthData.current?.score ?? 0) >= 70 ? 'text-emerald-400' :
+                  (healthData.current?.score ?? 0) >= 40 ? 'text-amber-400' : 'text-red-400'
+                }`}>⬡ {healthData.current?.score ?? '—'}</span>
+                <div>
+                  <p className="text-sm font-semibold">Health score</p>
+                  {healthData.current && (
+                    <p className="text-[10px] text-zinc-500">{new Date(healthData.current.createdAt).toLocaleString('pt-BR')}</p>
+                  )}
+                </div>
+              </div>
+              <button onClick={() => setHealthOpen(false)} className="text-zinc-500 hover:text-zinc-300 text-xs">fechar</button>
+            </div>
+            <div className="overflow-y-auto flex-1 px-6 py-4 space-y-5">
+              {healthData.current && (
+                <div className="space-y-2">
+                  <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wide">Breakdown</p>
+                  {([
+                    ['Atividade recente', 'activity', 20],
+                    ['Documentação em dia', 'documentation', 20],
+                    ['Consistência', 'consistency', 20],
+                    ['Next steps claros', 'nextSteps', 15],
+                    ['Blockers resolvendo', 'blockers', 15],
+                    ['Foco definido', 'focus', 10],
+                  ] as Array<[string, keyof HealthBreakdown, number]>).map(([label, key, weight]) => {
+                    const val = healthData.current!.breakdown[key]
+                    return (
+                      <div key={key}>
+                        <div className="flex items-center justify-between mb-0.5">
+                          <span className="text-xs text-zinc-400">{label}</span>
+                          <span className="text-xs font-mono text-zinc-300">{val} <span className="text-zinc-600">/ 100 · {weight}%</span></span>
+                        </div>
+                        <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+                          <div
+                            className={`h-full rounded-full transition-all ${
+                              val >= 70 ? 'bg-emerald-500' : val >= 40 ? 'bg-amber-500' : 'bg-red-500'
+                            }`}
+                            style={{ width: `${val}%` }}
+                          />
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+              {healthData.history.length > 1 && (
+                <div>
+                  <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wide mb-2">Histórico 30 dias</p>
+                  <div className="flex items-end gap-0.5 h-12">
+                    {healthData.history.map((h) => (
+                      <div
+                        key={h.id}
+                        className={`flex-1 rounded-sm min-w-[4px] transition-all ${
+                          h.score >= 70 ? 'bg-emerald-600' : h.score >= 40 ? 'bg-amber-600' : 'bg-red-700'
+                        }`}
+                        style={{ height: `${Math.max(4, h.score)}%` }}
+                        title={`${new Date(h.createdAt).toLocaleDateString('pt-BR')}: ${h.score}`}
+                      />
+                    ))}
+                  </div>
+                  <div className="flex justify-between mt-1">
+                    <span className="text-[9px] text-zinc-700">{new Date(healthData.history[0].createdAt).toLocaleDateString('pt-BR')}</span>
+                    <span className="text-[9px] text-zinc-700">{new Date(healthData.history[healthData.history.length - 1].createdAt).toLocaleDateString('pt-BR')}</span>
+                  </div>
+                </div>
+              )}
+              {!healthData.current && (
+                <p className="text-zinc-500 text-xs text-center py-6">Nenhum score calculado. Faça um refresh do estado do projeto para calcular.</p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Recommendations modal */}
       {recsOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -1020,6 +1137,51 @@ export default function Home() {
                   <ul className="space-y-1">{projectState.docGaps.map((g, i) => (
                     <li key={i} className="text-xs text-zinc-500">· {g}</li>
                   ))}</ul>
+                </div>
+              )}
+              {projectState.activeFocus && (
+                <div className="border border-indigo-800 bg-indigo-950/30 rounded-xl p-3">
+                  <p className="text-[10px] font-semibold text-indigo-400 uppercase tracking-wide mb-1">Foco ativo</p>
+                  <p className="text-xs text-zinc-200">{projectState.activeFocus}</p>
+                  {projectState.definitionOfDone && (
+                    <p className="text-[10px] text-zinc-500 mt-1">Done: {projectState.definitionOfDone}</p>
+                  )}
+                </div>
+              )}
+              {projectState.milestones && projectState.milestones.length > 0 && (
+                <div>
+                  <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wide mb-1">Milestones</p>
+                  <ul className="space-y-1">
+                    {projectState.milestones.map((m) => (
+                      <li key={m.id} className="flex items-center gap-2 text-xs">
+                        <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                          m.status === 'done' ? 'bg-emerald-500' :
+                          m.status === 'active' ? 'bg-amber-400' : 'bg-zinc-600'
+                        }`} />
+                        <span className={m.status === 'done' ? 'text-zinc-600 line-through' : 'text-zinc-300'}>{m.title}</span>
+                        <span className="text-[9px] text-zinc-600 ml-auto">{m.status}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {projectState.backlog && projectState.backlog.length > 0 && (
+                <div>
+                  <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wide mb-1">Backlog</p>
+                  <ul className="space-y-1">
+                    {projectState.backlog.slice(0, 5).map((b) => (
+                      <li key={b.id} className="flex items-center gap-2 text-xs">
+                        <span className={`text-[9px] px-1.5 py-0.5 rounded font-medium ${
+                          b.priority === 'high' ? 'bg-red-900 text-red-300' :
+                          b.priority === 'medium' ? 'bg-amber-900 text-amber-300' : 'bg-zinc-700 text-zinc-500'
+                        }`}>{b.priority}</span>
+                        <span className="text-zinc-400 truncate">{b.title}</span>
+                      </li>
+                    ))}
+                    {projectState.backlog.length > 5 && (
+                      <li className="text-[10px] text-zinc-600">+{projectState.backlog.length - 5} itens</li>
+                    )}
+                  </ul>
                 </div>
               )}
               <p className="text-[10px] text-zinc-700">Atualizado em {new Date(projectState.updatedAt).toLocaleString('pt-BR')}</p>
@@ -1538,6 +1700,19 @@ export default function Home() {
             >
               <div className={`w-2 h-2 rounded-full ${RISK_COLORS[projectState.riskLevel]}`} />
               {STAGE_LABELS[projectState.stage] ?? projectState.stage}
+            </button>
+          )}
+          {activeProjectId && healthData?.current && (
+            <button
+              onClick={() => setHealthOpen(true)}
+              className={`flex items-center gap-1 text-xs font-mono font-semibold transition-colors ${
+                healthData.current.score >= 70 ? 'text-emerald-400 hover:text-emerald-300' :
+                healthData.current.score >= 40 ? 'text-amber-400 hover:text-amber-300' :
+                                                  'text-red-400 hover:text-red-300'
+              }`}
+              title="Health score do projeto"
+            >
+              ⬡ {healthData.current.score}
             </button>
           )}
           {activeProjectId && gitContext && gitContext.lastBranch && (

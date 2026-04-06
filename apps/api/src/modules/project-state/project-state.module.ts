@@ -1,8 +1,10 @@
 import { Module } from '@nestjs/common'
 import { ProjectStateController } from './project-state.controller'
 import { ProjectStateService } from './project-state.service'
+import { HealthModule } from '../health/health.module'
 
 @Module({
+  imports: [HealthModule],
   controllers: [ProjectStateController],
   providers: [ProjectStateService],
   exports: [ProjectStateService],

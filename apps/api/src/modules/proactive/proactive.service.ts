@@ -216,6 +216,12 @@ export class ProactiveService {
       if (consistencyRec) newRecs.push(consistencyRec)
     }
 
+    // ── Regra 6: Drift — goals vs atividade recente ───────────────────────────
+    if (project.goals && events.length >= 10) {
+      const driftRec = await this.checkDrift(projectId, project.goals, events)
+      if (driftRec) newRecs.push(driftRec)
+    }
+
     if (newRecs.length > 0) {
       await this.prisma.projectRecommendation.createMany({ data: newRecs })
     } else {
@@ -230,6 +236,62 @@ export class ProactiveService {
           action: null,
         },
       })
+    }
+  }
+
+  private async checkDrift(
+    projectId: string,
+    goals: string,
+    events: Array<{ source: string; type: string; content: string; ts: Date }>,
+  ): Promise<{ projectId: string; type: string; title: string; description: string; priority: string; action: string | null } | null> {
+    const recentEvents = events
+      .slice(0, 20)
+      .map(e => `[${e.ts.toLocaleDateString('pt-BR')}] ${e.content}`)
+      .join('\n')
+
+    const prompt = `Verifique se o trabalho recente neste projeto está alinhado com os objetivos declarados.
+
+Objetivos do projeto:
+${goals}
+
+Atividade recente (últimas 20 entradas):
+${recentEvents}
+
+Se o foco atual divergiu significativamente dos objetivos (ex.: trabalhando em features secundárias enquanto objetivos principais estão sem atividade), responda em JSON:
+{
+  "drifted": true,
+  "title": "título curto do drift",
+  "description": "descrição específica (max 150 chars) — o que divergiu e como",
+  "severity": "low|medium|high"
+}
+
+Se o trabalho está alinhado com os objetivos, responda:
+{ "drifted": false }`
+
+    try {
+      const res = await this.llm.chat.completions.create({
+        model: 'gpt-4o-mini',
+        temperature: 0,
+        response_format: { type: 'json_object' },
+        messages: [{ role: 'user', content: prompt }],
+      })
+
+      const result = JSON.parse(res.choices[0].message.content ?? '{}') as {
+        drifted: boolean; title?: string; description?: string; severity?: string
+      }
+
+      if (!result.drifted) return null
+
+      return {
+        projectId,
+        type: 'drift',
+        title: result.title ?? 'Foco divergindo dos objetivos',
+        description: result.description ?? '',
+        priority: result.severity === 'high' ? 'high' : result.severity === 'medium' ? 'medium' : 'low',
+        action: 'Revise os objetivos do projeto ou registre um checkpoint explicando a mudança de foco.',
+      }
+    } catch {
+      return null
     }
   }
 

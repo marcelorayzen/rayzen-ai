@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { PrismaClient } from '@prisma/client'
 import OpenAI from 'openai'
+import { HealthScoreService } from '../health/health.service'
 
 export interface Milestone {
   id: string
@@ -35,7 +36,10 @@ export class ProjectStateService {
   private prisma = new PrismaClient()
   private llm: OpenAI
 
-  constructor(private config: ConfigService) {
+  constructor(
+    private config: ConfigService,
+    private healthScore: HealthScoreService,
+  ) {
     this.llm = new OpenAI({
       baseURL: this.config.get('LITELLM_BASE_URL', 'http://localhost:4000/v1'),
       apiKey: this.config.get('LITELLM_MASTER_KEY'),
@@ -197,6 +201,9 @@ Regras:
         definitionOfDone: derived.definitionOfDone || null,
       },
     })
+
+    // Compute health score in background after state refresh (non-blocking)
+    this.healthScore.compute(projectId).catch(() => null)
 
     return this.serialize(state)
   }

@@ -22,6 +22,7 @@ import { ObsidianModule } from './modules/obsidian/obsidian.module'
 import { ProjectStateModule } from './modules/project-state/project-state.module'
 import { GitModule } from './modules/git/git.module'
 import { ProactiveModule } from './modules/proactive/proactive.module'
+import { HealthModule } from './modules/health/health.module'
 
 @Module({
   imports: [
@@ -47,6 +48,7 @@ import { ProactiveModule } from './modules/proactive/proactive.module'
     ProjectStateModule,
     GitModule,
     ProactiveModule,
+    HealthModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })

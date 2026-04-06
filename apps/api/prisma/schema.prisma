@@ -26,6 +26,7 @@ model Project {
   projectDocuments     ProjectDocument[]
   projectState         ProjectState?
   recommendations      ProjectRecommendation[]
+  healthScores         ProjectHealthScore[]
 
   @@map("projects")
 }
@@ -130,6 +131,19 @@ model ProjectState {
   project Project @relation(fields: [projectId], references: [id])
 
   @@map("project_states")
+}
+
+model ProjectHealthScore {
+  id         String   @id @default(uuid())
+  projectId  String   @map("project_id")
+  score      Int      // 0–100
+  breakdown  Json     // { activity, documentation, consistency, nextSteps, blockers, focus }
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  project Project @relation(fields: [projectId], references: [id])
+
+  @@index([projectId, createdAt(sort: Desc)])
+  @@map("project_health_scores")
 }
 
 model Document {
