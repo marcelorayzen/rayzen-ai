@@ -216,6 +216,7 @@ export default function Home() {
   const drainActiveRef = useRef(false)
   const bottomRef = useRef<HTMLDivElement>(null)
   const submitMessageRef = useRef<(text: string) => void>(() => {})
+  const inputRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
     const token = localStorage.getItem('rayzen_token')
@@ -805,6 +806,7 @@ export default function Home() {
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     sendMessage(input.trim())
+    setTimeout(() => inputRef.current?.focus(), 0)
   }
 
   function formatRelativeTime(dateStr: string) {
@@ -2000,13 +2002,20 @@ export default function Home() {
       {/* Input */}
       <div className="border-t border-zinc-800 px-4 py-4">
         <form onSubmit={handleSubmit} className="flex gap-2 max-w-3xl mx-auto">
-          <input
-            type="text"
+          <textarea
+            ref={inputRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault()
+                if (input.trim() && !loading) handleSubmit(e as unknown as React.FormEvent)
+              }
+            }}
             placeholder="Digite uma mensagem ou use o microfone…"
             disabled={loading}
-            className="flex-1 rounded-xl bg-zinc-800 px-4 py-3 text-sm outline-none placeholder:text-zinc-500 focus:ring-2 focus:ring-zinc-600 disabled:opacity-50"
+            rows={1}
+            className="flex-1 rounded-xl bg-zinc-800 px-4 py-3 text-sm outline-none placeholder:text-zinc-500 focus:ring-2 focus:ring-zinc-600 disabled:opacity-50 resize-none"
           />
           <button
             type="button"
