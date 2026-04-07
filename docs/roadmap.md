@@ -120,14 +120,14 @@ Cada fase tem escopo mínimo e critério de done explícito. Nada avança sem o 
 
 ### O que implementar
 
-- [ ] Tabela `project_states`: `id`, `project_id`, `objective`, `stage`, `blockers[]`, `recent_decisions[]`, `next_steps[]`, `risks[]`, `doc_gaps[]`, `risk_level` (`low|medium|high`), `updated_at`
-- [ ] `ProjectStateService`: `refresh(project_id)` — agrega events + artifacts, chama LLM (json_object), upsert
-- [ ] Endpoint `GET /projects/:id/state` e `POST /projects/:id/state/refresh`
-- [ ] Campo `intent` em `events`: `decision | idea | problem | reference | checkpoint`
-- [ ] `POST /synthesis/checkpoint` — checkpoint manual: sintetiza eventos recentes (últimas 2h ou desde último checkpoint)
-- [ ] UI: painel de estado estruturado no header do projeto (objetivo, stage, risk_level, blockers)
-- [ ] UI: botão "Checkpoint" na barra de ações
-- [ ] UI: botões de captura rápida ("+ Decisão", "+ Ideia", "+ Problema") com modal leve
+- [x] Tabela `project_states`: `id`, `project_id`, `objective`, `stage`, `blockers[]`, `recent_decisions[]`, `next_steps[]`, `risks[]`, `doc_gaps[]`, `risk_level` (`low|medium|high`), `updated_at`
+- [x] `ProjectStateService`: `refresh(project_id)` — agrega events + artifacts, chama LLM (json_object), upsert
+- [x] Endpoint `GET /projects/:id/state` e `POST /projects/:id/state/refresh`
+- [x] Campo `intent` em `events`: `decision | idea | problem | reference | checkpoint`
+- [x] `POST /synthesis/checkpoint` — checkpoint manual: sintetiza eventos recentes (últimas 2h ou desde último checkpoint)
+- [x] UI: painel de estado estruturado no header do projeto (objetivo, stage, risk_level, blockers)
+- [x] UI: botão "Checkpoint" na barra de ações
+- [x] UI: botões de captura rápida ("+ Decisão", "+ Ideia", "+ Problema") com modal leve
 
 ### Critério de done
 
@@ -143,13 +143,13 @@ Cada fase tem escopo mínimo e critério de done explícito. Nada avança sem o 
 
 ### O que implementar
 
-- [ ] Tabela `project_document_versions`: `id`, `document_id`, `content`, `diff` (text), `reason`, `source_event_ids[]`, `created_at`
-- [ ] Quando `DocumentationService` regenera um doc: salva versão anterior + diff antes de atualizar
-- [ ] Campo `confidence` (`low|medium|high`) e `sources[]` no `SessionArtifact`
-- [ ] Endpoint `GET /documentation/:project_id/:type/versions` — histórico de versões
-- [ ] UI: botão "Ver histórico" no doc → lista de versões com diff colapsável
-- [ ] UI: badge de confiança nos artefatos de síntese
-- [ ] Endpoint `GET /events/:id/why` — eventos e artefatos que referenciam este evento (trilha de causalidade)
+- [x] Tabela `project_document_versions`: `id`, `document_id`, `content`, `diff` (text), `reason`, `source_event_ids[]`, `created_at`
+- [x] Quando `DocumentationService` regenera um doc: salva versão anterior + diff antes de atualizar
+- [x] Campo `confidence` (`low|medium|high`) e `sources[]` no `SessionArtifact`
+- [x] Endpoint `GET /documentation/:project_id/:type/versions` — histórico de versões
+- [x] UI: botão "Ver histórico" no doc → lista de versões com diff colapsável
+- [x] UI: badge de confiança nos artefatos de síntese
+- [x] Endpoint `GET /events/:id/why` — eventos e artefatos que referenciam este evento (trilha de causalidade)
 
 ### Critério de done
 
@@ -165,11 +165,11 @@ Cada fase tem escopo mínimo e critério de done explícito. Nada avança sem o 
 
 ### O que implementar
 
-- [ ] Hook `PostToolUse` enriquecido: inclui branch atual + hash do último commit no payload
-- [ ] Endpoint `POST /events/git` — recebe push/PR webhook do GitHub, salva como evento
-- [ ] `GitContextService`: `getProjectContext(project_id)` — agrega branch, commits recentes, arquivos mais tocados
-- [ ] Correlação na síntese: ao sintetizar sessão, inclui contexto git do período
-- [ ] UI: na timeline, eventos de código mostram branch + arquivo alterado com link
+- [x] Hook `PostToolUse` enriquecido: inclui branch atual + hash do último commit no payload
+- [x] Endpoint `POST /events/git` — recebe push/PR webhook do GitHub, salva como evento
+- [x] `GitContextService`: `getProjectContext(project_id)` — agrega branch, commits recentes, arquivos mais tocados
+- [x] Correlação na síntese: ao sintetizar sessão, inclui contexto git do período
+- [x] UI: na timeline, eventos de código mostram branch + arquivo alterado com link
 
 ### Critério de done
 
@@ -185,14 +185,14 @@ Cada fase tem escopo mínimo e critério de done explícito. Nada avança sem o 
 
 ### O que implementar
 
-- [ ] `ProactiveService`: roda a cada 6h por projeto ativo
+- [x] `ProactiveService`: roda a cada 6h por projeto ativo
   - detecta projetos sem atividade há >7 dias → alerta
   - detecta docs com `reviewed_at` > 30 dias → sugere revisão
   - detecta `blockers[]` que não diminuíram em 3+ sessões → escalona
   - detecta next_steps que não viraram events → sugere ação
-- [ ] Endpoint `GET /projects/:id/recommendations` — lista de recomendações com prioridade
-- [ ] `ConsistencyAgent`: compara README vs project_state, decisions_log vs events recentes
-- [ ] UI: painel "Recomendações" com ações sugeridas e botão de dismiss
+- [x] Endpoint `GET /projects/:id/recommendations` — lista de recomendações com prioridade
+- [x] `ConsistencyAgent`: compara README vs project_state, decisions_log vs events recentes
+- [x] UI: painel "Recomendações" com ações sugeridas e botão de dismiss
 
 ### Critério de done
 
@@ -210,11 +210,11 @@ Cada fase tem escopo mínimo e critério de done explícito. Nada avança sem o 
 
 ### O que implementar
 
-- [ ] Estender `ProjectState` com: `milestones[]` (com status `pending|active|done`), `backlog[]` (itens ordenados por prioridade), `activeFocus` (o que está sendo trabalhado agora), `definitionOfDone` (critério de aceite do milestone atual)
-- [ ] Heurística de promoção automática: blocker presente em 3+ refreshes do estado → sobe para `activeFocus`
-- [ ] `POST /projects/:id/resume` — assistente de retomada: dado projeto inativo >24h, retorna brief estruturado com último estado confiável, mudanças recentes, blockers ativos e próximo melhor passo
-- [ ] UI: painel "agora / depois / bloqueado" como view primária do estado do projeto
-- [ ] UI: botão "Retomar" no header quando projeto inativo >24h → abre resumption brief
+- [x] Estender `ProjectState` com: `milestones[]` (com status `pending|active|done`), `backlog[]` (itens ordenados por prioridade), `activeFocus` (o que está sendo trabalhado agora), `definitionOfDone` (critério de aceite do milestone atual)
+- [x] Heurística de promoção automática: blocker presente em 3+ refreshes do estado → sobe para `activeFocus`
+- [x] `POST /projects/:id/resume` — assistente de retomada: dado projeto inativo >24h, retorna brief estruturado com último estado confiável, mudanças recentes, blockers ativos e próximo melhor passo
+- [x] UI: painel "agora / depois / bloqueado" como view primária do estado do projeto
+- [x] UI: botão "Retomar" no header quando projeto inativo >24h → abre resumption brief
 
 ### Critério de done
 
@@ -243,13 +243,13 @@ Cada fase tem escopo mínimo e critério de done explícito. Nada avança sem o 
 
 ### O que implementar
 
-- [ ] Tabela `project_health_scores`: `id`, `project_id`, `score`, `breakdown` (JSON com as 6 dimensões), `created_at`
-- [ ] `HealthScoreService.compute(project_id)` — calcula e persiste score; roda ao final de cada refresh de estado
-- [ ] Adicionar regra de drift ao `ProactiveService`: compara `project.goals` com eventos e commits recentes — se foco divergiu, emite recomendação tipo `drift`
-- [ ] Endpoint `GET /projects/:id/health` — score atual + histórico dos últimos 30 dias
-- [ ] Ampliar categorias de inconsistência: `warning | inconsistency | missing_evidence | stale_knowledge | orphan_artifact | drift`
-- [ ] UI: badge numérico no header (`⬡ 74`) com cor por faixa (verde ≥70, âmbar 40–69, vermelho <40)
-- [ ] UI: mini-gráfico de curva histórica no painel de estado do projeto
+- [x] Tabela `project_health_scores`: `id`, `project_id`, `score`, `breakdown` (JSON com as 6 dimensões), `created_at`
+- [x] `HealthScoreService.compute(project_id)` — calcula e persiste score; roda ao final de cada refresh de estado
+- [x] Adicionar regra de drift ao `ProactiveService`: compara `project.goals` com eventos e commits recentes — se foco divergiu, emite recomendação tipo `drift`
+- [x] Endpoint `GET /projects/:id/health` — score atual + histórico dos últimos 30 dias
+- [x] Ampliar categorias de inconsistência: `warning | inconsistency | missing_evidence | stale_knowledge | orphan_artifact | drift`
+- [x] UI: badge numérico no header (`⬡ 74`) com cor por faixa (verde ≥70, âmbar 40–69, vermelho <40)
+- [x] UI: mini-gráfico de curva histórica no painel de estado do projeto
 
 ### Critério de done
 
@@ -267,15 +267,15 @@ Cada fase tem escopo mínimo e critério de done explícito. Nada avança sem o 
 
 ### O que implementar
 
-- [ ] Campo `memory_class` em `Event`: `inbox | working | consolidated | archive` (default: `inbox`)
-- [ ] Regras de promoção automática:
+- [x] Campo `memory_class` em `Event`: `inbox | working | consolidated | archive` (default: `inbox`)
+- [x] Regras de promoção automática:
   - evento com `intent: 'decision'` → `consolidated`
   - evento com `intent: 'problem'` + sem resolução em 48h → `working`
   - evento `inbox` sem referência em 30 dias → `archive`
-- [ ] `SynthesisService` filtra por class: usa `consolidated + working`, ignora `archive` no contexto enviado ao LLM
-- [ ] `DocumentationService` idem: contexto construído a partir de `consolidated` prioritariamente
-- [ ] Endpoint `PATCH /events/:id/class` — promoção/rebaixamento manual
-- [ ] UI: filtro por `memory_class` na timeline de atividade
+- [x] `SynthesisService` filtra por class: usa `consolidated + working`, ignora `archive` no contexto enviado ao LLM
+- [x] `DocumentationService` idem: contexto construído a partir de `consolidated` prioritariamente
+- [x] Endpoint `PATCH /events/:id/class` — promoção/rebaixamento manual
+- [x] UI: filtro por `memory_class` na timeline de atividade
 
 ### Critério de done
 
@@ -303,12 +303,12 @@ Cada fase tem escopo mínimo e critério de done explícito. Nada avança sem o 
 
 ### O que implementar
 
-- [ ] Campo `mode` em `ConversationMessage` e `SessionArtifact`
-- [ ] Objeto de configuração por modo: `systemPromptSuffix`, `eventWeights`, `synthesisFocus`
-- [ ] `OrchestratorService` aplica config do modo ativo na montagem do contexto
-- [ ] `SynthesisService` usa `synthesisFocus` do modo para ajustar o prompt de síntese
-- [ ] Seletor de modo na UI (junto ao seletor de projeto no header)
-- [ ] Modo persiste na sessão — novos eventos são tagged com o modo ativo
+- [x] Campo `mode` em `ConversationMessage` e `SessionArtifact`
+- [x] Objeto de configuração por modo: `systemPromptSuffix`, `eventWeights`, `synthesisFocus`
+- [x] `OrchestratorService` aplica config do modo ativo na montagem do contexto
+- [x] `SynthesisService` usa `synthesisFocus` do modo para ajustar o prompt de síntese
+- [x] Seletor de modo na UI (junto ao seletor de projeto no header)
+- [x] Modo persiste na sessão — novos eventos são tagged com o modo ativo
 
 ### Critério de done
 

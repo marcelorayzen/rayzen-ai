@@ -3,7 +3,7 @@
 <img src="https://img.shields.io/badge/Rayzen_AI-v0.1.0-6366f1?style=for-the-badge&logoColor=white" />
 <img src="https://img.shields.io/badge/TypeScript-100%25-3178c6?style=for-the-badge&logo=typescript&logoColor=white" />
 <img src="https://img.shields.io/badge/NestJS-10-e0234e?style=for-the-badge&logo=nestjs&logoColor=white" />
-<img src="https://img.shields.io/badge/Next.js-15-000000?style=for-the-badge&logo=next.js&logoColor=white" />
+<img src="https://img.shields.io/badge/Next.js-16-000000?style=for-the-badge&logo=next.js&logoColor=white" />
 <img src="https://img.shields.io/github/actions/workflow/status/marcelorayzen/rayzen-ai/ci.yml?branch=main&style=for-the-badge&label=CI" />
 
 <br /><br />
@@ -131,7 +131,7 @@ See [docs/architecture.md](docs/architecture.md) for the full module catalogue a
 All specs use `{ provide: PrismaService, useValue: mockPrisma }` — no `new PrismaClient()` in tests, consistent with the DI model.
 
 ```bash
-pnpm test:cov    # jest --coverage  (functions ≥ 80%, branches ≥ 70%)
+pnpm test:cov    # jest --coverage  (thresholds: functions ≥ 70%, branches ≥ 25%, lines ≥ 50%)
 ```
 
 See [docs/validation.md](docs/validation.md) for the full validation philosophy and coverage targets.

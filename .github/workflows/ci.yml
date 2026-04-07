@@ -31,7 +31,7 @@ jobs:
         run: pnpm --filter api db:generate
 
       - name: Type check
-        run: pnpm --filter api typecheck && pnpm --filter agent typecheck
+        run: pnpm --filter api typecheck && pnpm --filter agent typecheck && pnpm --filter web typecheck
 
   test:
     name: Tests & Coverage
