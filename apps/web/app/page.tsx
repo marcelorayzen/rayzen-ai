@@ -1379,11 +1379,11 @@ export default function Home() {
                             'bg-zinc-800 text-zinc-500'
                           }`}>{ev.memoryClass}</span>
                         )}
-                        {git?.['branch'] && (
-                          <span className="text-[10px] font-mono text-indigo-400">⎇ {String(git['branch'])}</span>
+                        {typeof git?.['branch'] === 'string' && (
+                          <span className="text-[10px] font-mono text-indigo-400">⎇ {git['branch']}</span>
                         )}
-                        {git?.['commitHash'] && (
-                          <span className="text-[10px] font-mono text-zinc-600">{String(git['commitHash'])}</span>
+                        {typeof git?.['commitHash'] === 'string' && (
+                          <span className="text-[10px] font-mono text-zinc-600">{git['commitHash']}</span>
                         )}
                       </div>
                     </div>
