@@ -37,7 +37,7 @@ describe('MemoryService', () => {
         MemoryService,
         { provide: PrismaService, useValue: mockPrisma },
         { provide: ConfigService, useValue: { get: mockConfigGet } },
-        { provide: EventService, useValue: { emit: jest.fn() } },
+        { provide: EventService, useValue: { create: jest.fn().mockResolvedValue(undefined) } },
       ],
     }).compile()
 

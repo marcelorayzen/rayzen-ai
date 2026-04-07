@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing'
 import { getQueueToken } from '@nestjs/bull'
 import { ExecutionService } from '../execution.service'
+import { EventService } from '../../event/event.service'
 
 const mockQueue = {
   add: jest.fn(),
@@ -19,6 +20,10 @@ describe('ExecutionService', () => {
         {
           provide: getQueueToken('agent-tasks'),
           useValue: mockQueue,
+        },
+        {
+          provide: EventService,
+          useValue: { create: jest.fn().mockResolvedValue(undefined) },
         },
       ],
     }).compile()

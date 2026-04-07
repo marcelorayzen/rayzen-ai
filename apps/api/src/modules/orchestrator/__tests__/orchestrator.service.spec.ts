@@ -81,7 +81,7 @@ describe('OrchestratorService', () => {
           },
         },
         { provide: PrismaService, useValue: mockPrisma },
-        { provide: EventService, useValue: { emit: jest.fn() } },
+        { provide: EventService, useValue: { create: jest.fn().mockResolvedValue(undefined) } },
       ],
     }).compile()
 
