@@ -70,16 +70,16 @@
     <td><img src="docs/assets/captura-rapida.png" alt="Captura rápida" width="360" /></td>
   </tr>
   <tr>
-    <td align="center"><sub>Recomendações proativas com prioridade — detecta padrões e riscos automaticamente</sub></td>
+    <td align="center"><sub>Recomendações proativas — detecta inconsistências como documentação desatualizada em relação ao código</sub></td>
     <td align="center"><sub>Captura rápida de decisões, ideias, problemas e referências com baixo atrito</sub></td>
   </tr>
   <tr>
     <td><img src="docs/assets/atividade.png" alt="Atividade e checkpoint" width="360" /></td>
-    <td><img src="docs/assets/documentacao-viva.png" alt="Documentação viva" width="360" /></td>
+    <td><img src="docs/assets/documentacao-viva.png" alt="Síntese de sessões" width="360" /></td>
   </tr>
   <tr>
-    <td align="center"><sub>Checkpoint indexa o contexto — histórico de ações por sessão com rastreabilidade completa</sub></td>
-    <td align="center"><sub>Documentação viva: estado do projeto, decisões, próximas ações e diário de trabalho</sub></td>
+    <td align="center"><sub>Atividade com filtros de memória hierárquica — all, consolidated, working, inbox, archive</sub></td>
+    <td align="center"><sub>Síntese de sessões — decisões, aprendizados e próximos passos extraídos automaticamente</sub></td>
   </tr>
   <tr>
     <td><img src="docs/assets/brain-indexar.png" alt="Indexar no Brain" width="360" /></td>
@@ -95,7 +95,7 @@
   </tr>
   <tr>
     <td align="center"><sub>Configuração de modelos por função — classify, chat, brain com temperature individual</sub></td>
-    <td align="center"><sub>26 ações do Agent configuráveis individualmente + integração com Obsidian vault</sub></td>
+    <td align="center"><sub>26 ações do Agent habilitáveis individualmente — apps, git, docker, email, run_tests, inspect_schema</sub></td>
   </tr>
 </table>
 
