@@ -87,7 +87,7 @@
   </tr>
   <tr>
     <td align="center"><sub>Brain aceita GitHub, arquivo (PDF/TXT) e URL — memória semântica com pgvector</sub></td>
-    <td align="center"><sub>PC Agent executando ação local autorizada — localiza e move arquivos no ambiente real</sub></td>
+    <td align="center"><sub>PC Agent em ação — lista pastas, tira screenshot e navega no sistema de arquivos via chat</sub></td>
   </tr>
   <tr>
     <td><img src="docs/assets/configuracoes-llm.png" alt="Configurações LLM" width="360" /></td>
