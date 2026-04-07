@@ -10,7 +10,7 @@
 
 <h1>Rayzen AI</h1>
 
-<p><strong>Plataforma pessoal de IA com memória semântica, automação do PC, geração de documentos,<br />integração com Notion e voz — construída como um monorepo NestJS de nível production.</strong></p>
+<p><strong>Plataforma de orquestração de contexto, documentação viva e assistência operacional para projetos de tecnologia.</strong><br />Mais do que um assistente conversacional — uma camada contínua de suporte ao desenvolvimento que acompanha sessões de trabalho, registra eventos, estrutura conhecimento, mantém artefatos atualizados e apoia execução via Agent local autorizado.</p>
 
 <p>
   <a href="README.en.md">🇺🇸 English</a> &nbsp;|&nbsp;
@@ -56,31 +56,48 @@
 
 <div align="center">
 
-<!--
-  SCREENSHOTS — como adicionar:
-  Salve as capturas em docs/assets/ com os nomes abaixo e remova os comentários.
-
-  <table>
-    <tr>
-      <td><img src="docs/assets/chat.png" alt="Chat" width="360" /></td>
-      <td><img src="docs/assets/agent.png" alt="PC Agent" width="360" /></td>
-    </tr>
-    <tr>
-      <td align="center"><sub>Chat com streaming SSE e roteamento por módulo</sub></td>
-      <td align="center"><sub>PC Agent executando tarefas locais</sub></td>
-    </tr>
-    <tr>
-      <td><img src="docs/assets/settings.png" alt="Configurações" width="360" /></td>
-      <td><img src="docs/assets/health.png" alt="Health Score" width="360" /></td>
-    </tr>
-    <tr>
-      <td align="center"><sub>Painel de configurações e work modes</sub></td>
-      <td align="center"><sub>Health score do projeto — 6 dimensões</sub></td>
-    </tr>
-  </table>
--->
-
-> **Screenshots em breve** — serão adicionados após o deploy na VPS.
+<table>
+  <tr>
+    <td><img src="docs/assets/interface-principal.png" alt="Interface principal" width="360" /></td>
+    <td><img src="docs/assets/work-modes.png" alt="Work modes" width="360" /></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>Interface centrada em projeto com seleção de contexto</sub></td>
+    <td align="center"><sub>5 modos de trabalho: implementação, debugging, arquitetura, estudo, revisão</sub></td>
+  </tr>
+  <tr>
+    <td><img src="docs/assets/recomendacoes.png" alt="Recomendações proativas" width="360" /></td>
+    <td><img src="docs/assets/captura-rapida.png" alt="Captura rápida" width="360" /></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>Recomendações proativas com prioridade — detecta padrões e riscos automaticamente</sub></td>
+    <td align="center"><sub>Captura rápida de decisões, ideias, problemas e referências com baixo atrito</sub></td>
+  </tr>
+  <tr>
+    <td><img src="docs/assets/atividade.png" alt="Atividade e checkpoint" width="360" /></td>
+    <td><img src="docs/assets/documentacao-viva.png" alt="Documentação viva" width="360" /></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>Checkpoint indexa o contexto — histórico de ações por sessão com rastreabilidade completa</sub></td>
+    <td align="center"><sub>Documentação viva: estado do projeto, decisões, próximas ações e diário de trabalho</sub></td>
+  </tr>
+  <tr>
+    <td><img src="docs/assets/brain-indexar.png" alt="Indexar no Brain" width="360" /></td>
+    <td><img src="docs/assets/agent-acao.png" alt="PC Agent em ação" width="360" /></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>Brain aceita GitHub, arquivo (PDF/TXT) e URL — memória semântica com pgvector</sub></td>
+    <td align="center"><sub>PC Agent executando ação local autorizada — localiza e move arquivos no ambiente real</sub></td>
+  </tr>
+  <tr>
+    <td><img src="docs/assets/configuracoes-llm.png" alt="Configurações LLM" width="360" /></td>
+    <td><img src="docs/assets/configuracoes-agent.png" alt="Configurações Agent" width="360" /></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>Configuração de modelos por função — classify, chat, brain com temperature individual</sub></td>
+    <td align="center"><sub>26 ações do Agent configuráveis individualmente + integração com Obsidian vault</sub></td>
+  </tr>
+</table>
 
 </div>
 
